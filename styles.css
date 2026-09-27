@@ -36,3 +36,123 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:inherit}button,a,
 @media(max-width:1050px){.hero-card{grid-template-columns:1fr auto}.hero-card__side{grid-column:1/-1;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;text-align:left}.hero-card__side p{margin:.4rem 0}.summary-grid{grid-template-columns:repeat(2,1fr)}.content-grid{grid-template-columns:1fr}.right-column{display:grid;grid-template-columns:1fr 1fr}}
 @media(max-width:720px){.topbar{height:auto;min-height:70px;padding:.72rem 1rem}.brand span,.sync-status{display:none}.brand__mark{width:41px;height:41px;border-radius:14px}.app-shell{width:min(100% - 1rem,1380px);padding-top:.7rem}.hero-card{grid-template-columns:1fr;padding:1.3rem;gap:1.2rem;border-radius:24px}.date-heading{justify-content:space-between}.date-heading>div{flex:1}.date-heading h1{font-size:1.72rem}.target-wrap{display:flex;align-items:center;gap:1rem;text-align:left}.target-ring{width:116px;height:116px;flex:0 0 116px}.target-ring strong{font-size:1.72rem}.target-percent{margin:0}.hero-card__side{grid-column:auto;display:block}.hero-card__side p{margin:.55rem 0 .85rem}.hero-card__side .button{width:100%}.summary-grid{gap:.55rem}.metric-card{min-height:96px;padding:.92rem;gap:.75rem}.metric-card__icon{width:37px;height:37px;flex-basis:37px}.metric-card strong{font-size:1.33rem}.content-grid{gap:.7rem}.right-column{display:flex}.panel{border-radius:20px}.panel__header{padding:1.08rem}.calendar-day{min-height:58px;padding:.4rem;border-radius:11px}.calendar-day__kcal{margin-top:.42rem;font-size:.52rem}.calendar-grid{gap:.2rem;padding:0 .5rem .75rem}.calendar-weekdays{padding-left:.5rem;padding-right:.5rem}.calendar-legend{padding:.7rem}.chart-wrap{height:265px}.data-tools{align-items:stretch;flex-direction:column}.data-tools__actions{flex-direction:column}.form-grid{grid-template-columns:1fr}.field--full{grid-column:auto}.modal__footer{flex-wrap:wrap}.modal{border-radius:21px}.modal form{padding:1.15rem}}
 @media(max-width:470px){.summary-grid{grid-template-columns:1fr 1fr}.metric-card{display:block}.metric-card__icon{margin-bottom:.7rem}.calendar-day__kcal{display:none}.calendar-day{min-height:49px}.calendar-day__dot{right:6px;top:6px}.panel__header{align-items:flex-start}.calendar-panel .panel__header{flex-direction:column}.calendar-nav{width:100%;justify-content:space-between}.meal-item{grid-template-columns:minmax(0,1fr) auto}.meal-item__actions{grid-column:1/-1;justify-content:flex-end;margin-top:-.2rem}.food-row{grid-template-columns:minmax(0,1fr) auto}.food-row__kcal{grid-column:2;grid-row:1}.food-row .mini-button{grid-column:2;grid-row:2}.brand strong{font-size:.9rem}.version-chip{display:none}}
+
+
+/* v2 — valori nutriționale */
+.nutrition-preview{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:.6rem;
+}
+.nutrition-preview__item{
+  min-width:0;
+  padding:.9rem .75rem;
+  border:1px solid var(--line);
+  border-radius:15px;
+  background:linear-gradient(145deg,#fff,#f8f9fd);
+}
+.nutrition-preview__item--calories{
+  border-color:#ddd9ff;
+  background:linear-gradient(145deg,#f0eeff,#faf9ff);
+}
+.nutrition-preview__item span,
+.nutrition-preview__item strong,
+.nutrition-preview__item small{display:block}
+.nutrition-preview__item span{
+  color:var(--muted);
+  font-size:.61rem;
+  font-weight:850;
+}
+.nutrition-preview__item strong{
+  margin:.28rem 0 .12rem;
+  font-size:1.32rem;
+  line-height:1;
+  letter-spacing:-.04em;
+}
+.nutrition-preview__item--calories strong{color:var(--primary)}
+.nutrition-preview__item small{
+  color:#9aa1b0;
+  font-size:.58rem;
+  font-weight:800;
+}
+.food-row--nutrition{align-items:start}
+.food-row__category{margin-bottom:.4rem}
+.food-macros{
+  display:flex;
+  flex-wrap:wrap;
+  gap:.3rem;
+}
+.food-macros span{
+  display:inline-flex!important;
+  align-items:center;
+  gap:.2rem;
+  margin:0!important;
+  padding:.24rem .4rem;
+  border-radius:999px;
+  background:#f3f4f8;
+  color:#687187!important;
+  font-size:.56rem!important;
+  font-weight:800;
+}
+.food-macros b{color:var(--primary);font-weight:950}
+.food-row__kcal{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+}
+.food-row__kcal strong{font-size:.78rem}
+.food-row__kcal small{
+  margin-top:.1rem;
+  color:var(--muted);
+  font-size:.52rem;
+  font-weight:750;
+  white-space:nowrap;
+}
+.field-help{
+  margin:.1rem 0 0;
+  color:var(--muted);
+  font-size:.62rem;
+  line-height:1.45;
+}
+.meal-item__name span b{color:var(--primary);font-weight:900}
+
+@media(max-width:720px){
+  .nutrition-preview{grid-template-columns:repeat(2,1fr)}
+}
+
+
+/* v3 — fibre, zahăr și export Excel */
+.button--excel{
+  border-color:#bfe2d0;
+  background:linear-gradient(145deg,#edf9f3,#e5f5ed);
+  color:#237454;
+  box-shadow:0 7px 18px rgba(54,168,117,.09);
+}
+.button--excel:hover{
+  border-color:#9fd2b9;
+  background:#e0f4ea;
+  color:#1d6749;
+}
+.nutrition-preview{
+  grid-template-columns:repeat(3,1fr);
+}
+@media(max-width:1050px){
+  .calendar-nav{flex-wrap:wrap;justify-content:flex-end}
+}
+@media(max-width:720px){
+  .calendar-nav{justify-content:stretch}
+  .calendar-nav .button--excel{order:4;flex:1 0 100%}
+  .nutrition-preview{grid-template-columns:repeat(2,1fr)}
+}
+
+.food-header-actions{
+  display:flex;
+  align-items:center;
+  gap:.5rem;
+  flex-wrap:wrap;
+}
+@media(max-width:560px){
+  .food-panel .panel__header{align-items:stretch;flex-direction:column}
+  .food-header-actions{width:100%}
+  .food-header-actions .button{flex:1}
+}

@@ -60,7 +60,7 @@
         <section class="panel calendar-panel">
           <div class="panel__header">
             <div><p class="eyebrow">CALENDAR</p><h2 id="calendarTitle">Luna</h2></div>
-            <div class="calendar-nav"><button id="prevMonth" class="icon-button icon-button--small" type="button">‹</button><button id="todayButton" class="button button--soft" type="button">Astăzi</button><button id="nextMonth" class="icon-button icon-button--small" type="button">›</button></div>
+            <div class="calendar-nav"><button id="prevMonth" class="icon-button icon-button--small" type="button">‹</button><button id="todayButton" class="button button--soft" type="button">Astăzi</button><button id="exportMonthExcel" class="button button--excel button--compact" type="button">⇩ Excel luna</button><button id="nextMonth" class="icon-button icon-button--small" type="button">›</button></div>
           </div>
           <div class="calendar-weekdays"><span>Lu</span><span>Ma</span><span>Mi</span><span>Jo</span><span>Vi</span><span>Sâ</span><span>Du</span></div>
           <div id="calendarGrid" class="calendar-grid"></div>
@@ -88,7 +88,11 @@
         <section class="panel food-panel">
           <div class="panel__header">
             <div><p class="eyebrow">BAZA DE ALIMENTE</p><h2>Calorii / 100 g</h2><p class="panel__hint">Editările se salvează automat în EtherCalc.</p></div>
-            <button id="openFoodDialog" class="button button--soft button--compact" type="button">+ Aliment nou</button>
+            <div class="food-header-actions">
+              <button id="importFoodsCsv" class="button button--ghost button--compact" type="button">⇧ Importă CSV</button>
+              <button id="openFoodDialog" class="button button--soft button--compact" type="button">+ Aliment nou</button>
+              <input id="foodCsvInput" class="sr-only" type="file" accept=".csv,text/csv" />
+            </div>
           </div>
           <label class="search-box"><span>⌕</span><input id="foodSearch" type="search" placeholder="Caută un aliment…" /></label>
           <div id="foodTable" class="food-table"></div>
@@ -114,7 +118,17 @@
         <label class="field field--full"><span>Aliment *</span><select id="mealFood" required></select></label>
         <label class="field"><span>Cantitate (g) *</span><input id="mealGrams" type="number" min="1" step="1" value="100" required /></label>
         <label class="field"><span>Masă</span><select id="mealType"><option>Mic dejun</option><option>Prânz</option><option>Cină</option><option>Gustare</option></select></label>
-        <label class="field field--full"><span>Calorii calculate</span><div class="calorie-preview"><strong id="mealCaloriesPreview">0</strong><span>kcal</span></div></label>
+        <div class="field field--full">
+          <span>Valori calculate pentru porție</span>
+          <div class="nutrition-preview">
+            <div class="nutrition-preview__item nutrition-preview__item--calories"><span>Calorii</span><strong id="mealCaloriesPreview">0</strong><small>kcal</small></div>
+            <div class="nutrition-preview__item"><span>Grăsimi</span><strong id="mealFatPreview">0</strong><small>g</small></div>
+            <div class="nutrition-preview__item"><span>Carbohidrați</span><strong id="mealCarbsPreview">0</strong><small>g</small></div>
+            <div class="nutrition-preview__item"><span>Proteine</span><strong id="mealProteinPreview">0</strong><small>g</small></div>
+            <div class="nutrition-preview__item"><span>Fibre</span><strong id="mealFiberPreview">0</strong><small>g</small></div>
+            <div class="nutrition-preview__item"><span>Zahăr</span><strong id="mealSugarPreview">0</strong><small>g</small></div>
+          </div>
+        </div>
         <label class="field field--full"><span>Notiță</span><input id="mealNote" maxlength="160" placeholder="Opțional: ex. cu lapte, fără sos…" /></label>
       </div>
       <div class="modal__footer"><button id="cancelMeal" class="button button--ghost" type="button">Renunță</button><button class="button button--primary" type="submit">Salvează</button></div>
@@ -127,14 +141,21 @@
       <input id="foodId" type="hidden" />
       <div class="form-grid">
         <label class="field field--full"><span>Denumire *</span><input id="foodName" required maxlength="100" placeholder="Ex: Orez fiert" /></label>
-        <label class="field"><span>kcal / 100 g *</span><input id="foodCalories" type="number" min="0" step="1" required /></label>
-        <label class="field"><span>Categorie</span><input id="foodCategory" maxlength="60" placeholder="Ex: Cereale" /></label>
+        <label class="field"><span>Calorii / 100 g *</span><input id="foodCalories" type="number" min="0" step="0.1" required /></label>
+        <label class="field"><span>Grăsimi / 100 g</span><input id="foodFat" type="number" min="0" step="0.1" value="0" /></label>
+        <label class="field"><span>Carbohidrați / 100 g</span><input id="foodCarbs" type="number" min="0" step="0.1" value="0" /></label>
+        <label class="field"><span>Proteine / 100 g</span><input id="foodProtein" type="number" min="0" step="0.1" value="0" /></label>
+        <label class="field"><span>Fibre / 100 g</span><input id="foodFiber" type="number" min="0" step="0.1" value="0" /></label>
+        <label class="field"><span>Zahăr / 100 g</span><input id="foodSugar" type="number" min="0" step="0.1" value="0" /></label>
+        <label class="field field--full"><span>Categorie</span><input id="foodCategory" maxlength="60" placeholder="Ex: Cereale" /></label>
+        <p class="field-help field--full">Valorile nutriționale se salvează în EtherCalc și se calculează automat în funcție de cantitatea consumată.</p>
       </div>
       <div class="modal__footer"><button id="deleteFood" class="button button--danger-soft" type="button" hidden>Șterge</button><span class="modal-spacer"></span><button id="cancelFood" class="button button--ghost" type="button">Renunță</button><button class="button button--primary" type="submit">Salvează</button></div>
     </form>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
