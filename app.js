@@ -5,6 +5,7 @@ const LOG_ROOM = '5ybwphczduwg';
 const FOOD_ROOM = 'yve145gi1nxa';
 const ETHERCALC = 'https://ethercalc.net';
 const SYNC_MS = 15000;
+const APP_TIMEZONE = 'Europe/Bucharest';
 const MEAL_ORDER = ['Mic dejun','Prânz','Cină','Gustare'];
 const DEFAULT_FOODS = [
   ['Orez fiert',130,0.3,28.2,2.7,0.4,0.1,'Cereale'],
@@ -69,8 +70,6 @@ const el = {
   foodDialog:$('#foodDialog'), foodForm:$('#foodForm'), foodId:$('#foodId'), foodName:$('#foodName'), foodCalories:$('#foodCalories'), foodFat:$('#foodFat'), foodCarbs:$('#foodCarbs'), foodProtein:$('#foodProtein'), foodFiber:$('#foodFiber'), foodSugar:$('#foodSugar'), foodCategory:$('#foodCategory'), foodDialogTitle:$('#foodDialogTitle'), deleteFood:$('#deleteFood'), foodTable:$('#foodTable'), foodSearch:$('#foodSearch'), showAllFoods:$('#showAllFoods'), importFoodsCsv:$('#importFoodsCsv'), foodCsvInput:$('#foodCsvInput'), toast:$('#toast')
 };
 
-const APP_TIMEZONE='Europe/Bucharest';
-
 function todayISO(){
   const parts=new Intl.DateTimeFormat('en-CA',{
     timeZone:APP_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'
@@ -91,24 +90,71 @@ function roomUrl(room,write=false){const safe=encodeURIComponent(room);return wr
 async function fetchWithTimeout(url,options={},timeoutMs=15000){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
-  try{return await fetch(url,{...options,signal:controller.signal,mode:'cors',credentials:'omit'})}
-  finally{clearTimeout(timer)}
+  try{
+    return await fetch(url,{...options,signal:controller.signal});
+  }finally{
+    clearTimeout(timer);
+  }
 }
 async function getCsv(room){
-  const r=await fetchWithTimeout(roomUrl(room),{method:'GET',cache:'no-store',headers:{'Accept':'text/csv'}});
-  if(!r.ok)throw new Error(`Citirea EtherCalc a eșuat (${r.status} ${r.statusText||''})`);
-  return r.text()
+  const encoded=encodeURIComponent(room);
+  const urls=[
+    `${ETHERCALC}/_/${encoded}/csv?t=${Date.now()}`,
+    `${ETHERCALC}/=${encoded}.csv?t=${Date.now()}`
+  ];
+
+  let lastError;
+  for(const url of urls){
+    for(let attempt=0;attempt<2;attempt++){
+      try{
+        const r=await fetchWithTimeout(url,{
+          method:'GET',
+          cache:'no-store'
+        },15000);
+
+        if(!r.ok){
+          throw new Error(`HTTP ${r.status} ${r.statusText||''}`.trim());
+        }
+
+        const text=await r.text();
+        if(typeof text!=='string'){
+          throw new Error('Răspuns CSV invalid.');
+        }
+        return text;
+      }catch(err){
+        lastError=err;
+        console.warn(`Citire EtherCalc ${room}, încercarea ${attempt+1}`,err);
+        if(attempt===0)await new Promise(resolve=>setTimeout(resolve,700));
+      }
+    }
+  }
+  throw new Error(`Citirea EtherCalc a eșuat pentru ${room}: ${lastError?.message||'eroare necunoscută'}`);
 }
 async function putCsv(room,csv){
-  const r=await fetchWithTimeout(roomUrl(room,true),{
-    method:'PUT',
-    cache:'no-store',
-    headers:{'Content-Type':'text/csv','Accept':'text/plain,text/csv,*/*'},
-    body:'\uFEFF'+csv
-  },20000);
-  const responseText=await r.text().catch(()=> '');
-  if(!r.ok)throw new Error(`Scrierea EtherCalc a eșuat (${r.status} ${r.statusText||''})${responseText?`: ${responseText.slice(0,180)}`:''}`);
-  return responseText
+  const url=roomUrl(room,true);
+  let lastError;
+
+  for(const body of [csv,'\uFEFF'+csv]){
+    try{
+      const r=await fetchWithTimeout(url,{
+        method:'PUT',
+        cache:'no-store',
+        headers:{'Content-Type':'text/csv;charset=UTF-8'},
+        body
+      },20000);
+
+      const responseText=await r.text().catch(()=> '');
+      if(!r.ok){
+        throw new Error(`HTTP ${r.status} ${r.statusText||''}${responseText?`: ${responseText.slice(0,180)}`:''}`);
+      }
+      return responseText;
+    }catch(err){
+      lastError=err;
+      console.warn(`Scriere EtherCalc ${room} eșuată`,err);
+    }
+  }
+
+  throw new Error(`Scrierea EtherCalc a eșuat pentru ${room}: ${lastError?.message||'eroare necunoscută'}`);
 }
 function sameRecord(remote,local){return !!remote&&String(remote.updatedAt||'')===String(local.updatedAt||'')}
 async function verifyMealsSaved(expected){
@@ -212,6 +258,31 @@ function mealsCsv(records=state.meals){
   ])
 }
 
+
+function recordTimestamp(record){
+  const t=Date.parse(record?.updatedAt||'');
+  return Number.isFinite(t)?t:0;
+}
+
+function mergeMealRecords(...collections){
+  const map=new Map();
+  collections.flat().forEach(record=>{
+    if(!record?.id)return;
+    const current=map.get(record.id);
+    if(!current || recordTimestamp(record)>=recordTimestamp(current)){
+      map.set(record.id,{...record});
+    }
+  });
+  return [...map.values()];
+}
+
+function collectionSignature(list){
+  return (list||[])
+    .map(x=>`${x.id}|${x.updatedAt||''}|${!!x.deleted}`)
+    .sort()
+    .join('\n');
+}
+
 function sameCollectionExact(a,b){
   return (a||[]).length===(b||[]).length && collectionSignature(a)===collectionSignature(b);
 }
@@ -221,37 +292,68 @@ async function syncAll({notify=false}={}){
   if(state.syncing||state.savingMeals||state.savingFoods)return;
 
   state.syncing=true;
-  setSync('Se sincronizează…');
+  setSync('Se conectează la EtherCalc…');
+
+  let foodError=null;
+  let mealError=null;
 
   try{
-    const [foodCsv,mealCsv]=await Promise.all([getCsv(FOOD_ROOM),getCsv(LOG_ROOM)]);
-    const remoteFoods=parseFoods(foodCsv);
-    const remoteMeals=parseMeals(mealCsv);
+    let foodCsv='';
+    let mealCsv='';
 
-    // EtherCalc este sursa unică de adevăr pentru jurnal.
-    state.foods=remoteFoods;
-    state.meals=remoteMeals;
+    try{
+      foodCsv=await getCsv(FOOD_ROOM);
+      state.foods=parseFoods(foodCsv);
+      await seedFoodsIfNeeded();
+    }catch(err){
+      foodError=err;
+      console.error('Eroare baza alimente EtherCalc:',err);
+    }
 
-    await seedFoodsIfNeeded();
+    try{
+      mealCsv=await getCsv(LOG_ROOM);
+      state.meals=parseMeals(mealCsv);
+    }catch(err){
+      mealError=err;
+      console.error('Eroare jurnal EtherCalc:',err);
+    }
 
-    const foodHeader=(parseCsv(foodCsv)[0]||[]).map(x=>String(x||'').trim().toLowerCase());
-    if(state.foods.length&&(!foodHeader.includes('fiber_per_100g')||!foodHeader.includes('sugar_per_100g'))){
-      state.savingFoods=true;
-      try{
-        await putCsv(FOOD_ROOM,foodsCsv());
-        state.lastFoodSaveAt=Date.now();
-      }finally{
-        state.savingFoods=false;
+    if(foodError && mealError){
+      throw new Error(`Alimente: ${foodError.message} | Jurnal: ${mealError.message}`);
+    }
+
+    if(foodCsv){
+      const foodHeader=(parseCsv(foodCsv)[0]||[]).map(x=>String(x||'').trim().toLowerCase());
+      if(state.foods.length&&(!foodHeader.includes('fiber_per_100g')||!foodHeader.includes('sugar_per_100g'))){
+        state.savingFoods=true;
+        try{
+          await putCsv(FOOD_ROOM,foodsCsv());
+          state.lastFoodSaveAt=Date.now();
+        }catch(err){
+          console.warn('Migrarea coloanelor alimentelor a eșuat.',err);
+        }finally{
+          state.savingFoods=false;
+        }
       }
     }
 
     renderAll();
+
     const activeMeals=state.meals.filter(m=>!m.deleted).length;
-    setSync(`EtherCalc ✓ · ${activeMeals} înregistrări · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit',timeZone:APP_TIMEZONE})}`,'ok');
-    if(notify)showToast('Datele au fost recitite din EtherCalc.');
+
+    if(mealError){
+      setSync(`Alimente conectate · jurnal indisponibil`,'error');
+      if(notify)showToast(`Jurnal EtherCalc: ${mealError.message}`);
+    }else if(foodError){
+      setSync(`Jurnal conectat · ${activeMeals} înregistrări`,'ok');
+      if(notify)showToast(`Baza de alimente: ${foodError.message}`);
+    }else{
+      setSync(`EtherCalc ✓ · ${activeMeals} înregistrări · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit',timeZone:APP_TIMEZONE})}`,'ok');
+      if(notify)showToast('Datele au fost recitite din EtherCalc.');
+    }
   }catch(e){
     console.error(e);
-    setSync('Eroare EtherCalc','error');
+    setSync(`Eroare EtherCalc: ${e.message}`,'error');
     if(notify)showToast(`Sincronizarea a eșuat: ${e.message}`);
   }finally{
     state.syncing=false;
@@ -587,4 +689,18 @@ window.addEventListener('online',()=>syncAll({notify:true}));
 setInterval(()=>{
   if(!document.hidden&&!state.savingMeals&&!state.savingFoods)syncAll({notify:false});
 },SYNC_MS);
+
+window.addEventListener('error',event=>{
+  console.error('Eroare JavaScript:',event.error||event.message);
+  if(el?.syncStatus){
+    setSync(`Eroare aplicație: ${event.message||'necunoscută'}`,'error');
+  }
+});
+window.addEventListener('unhandledrejection',event=>{
+  console.error('Promise respins:',event.reason);
+  if(el?.syncStatus){
+    setSync(`Eroare: ${event.reason?.message||event.reason||'operație eșuată'}`,'error');
+  }
+});
+
 renderAll();syncAll({notify:false});
