@@ -5,8 +5,6 @@ const LOG_ROOM = '5ybwphczduwg';
 const FOOD_ROOM = 'yve145gi1nxa';
 const ETHERCALC = 'https://ethercalc.net';
 const SYNC_MS = 15000;
-const MEAL_SHADOW_KEY='calorie_compass_meals_v6';
-const MEAL_DELETED_KEY='calorie_compass_deleted_meals_v6';
 const MEAL_ORDER = ['Mic dejun','Prânz','Cină','Gustare'];
 const DEFAULT_FOODS = [
   ['Orez fiert',130,0.3,28.2,2.7,0.4,0.1,'Cereale'],
@@ -60,7 +58,6 @@ const state = {
   savingFoods: false,
   lastMealSaveAt: 0,
   lastFoodSaveAt: 0,
-  deletedMealIds: new Set(),
   showAllFoods: false
 };
 const $ = s => document.querySelector(s);
@@ -72,7 +69,16 @@ const el = {
   foodDialog:$('#foodDialog'), foodForm:$('#foodForm'), foodId:$('#foodId'), foodName:$('#foodName'), foodCalories:$('#foodCalories'), foodFat:$('#foodFat'), foodCarbs:$('#foodCarbs'), foodProtein:$('#foodProtein'), foodFiber:$('#foodFiber'), foodSugar:$('#foodSugar'), foodCategory:$('#foodCategory'), foodDialogTitle:$('#foodDialogTitle'), deleteFood:$('#deleteFood'), foodTable:$('#foodTable'), foodSearch:$('#foodSearch'), showAllFoods:$('#showAllFoods'), importFoodsCsv:$('#importFoodsCsv'), foodCsvInput:$('#foodCsvInput'), toast:$('#toast')
 };
 
-function todayISO(){const d=new Date();return localISO(d)}
+const APP_TIMEZONE='Europe/Bucharest';
+
+function todayISO(){
+  const parts=new Intl.DateTimeFormat('en-CA',{
+    timeZone:APP_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(new Date());
+  const p={};
+  parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
+  return `${p.year}-${p.month}-${p.day}`;
+}
 function localISO(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function fromISO(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 function addDays(iso,n){const d=fromISO(iso);d.setDate(d.getDate()+n);return localISO(d)}
@@ -106,9 +112,13 @@ async function putCsv(room,csv){
 }
 function sameRecord(remote,local){return !!remote&&String(remote.updatedAt||'')===String(local.updatedAt||'')}
 async function verifyMealsSaved(expected){
-  const csv=await getCsv(LOG_ROOM),remote=parseMeals(csv);
-  const missing=expected.filter(x=>!sameRecord(remote.find(r=>r.id===x.id),x));
-  if(missing.length)throw new Error(`EtherCalc nu a confirmat ${missing.length} înregistrări din jurnal.`);
+  const csv=await getCsv(LOG_ROOM);
+  const remote=parseMeals(csv);
+  if(!sameCollectionExact(remote,expected)){
+    const missing=expected.filter(x=>!sameRecord(remote.find(r=>r.id===x.id),x));
+    const extras=remote.filter(x=>!expected.find(e=>e.id===x.id));
+    throw new Error(`EtherCalc nu a confirmat jurnalul complet (lipsă: ${missing.length}, suplimentare: ${extras.length}).`);
+  }
   return remote
 }
 async function verifyFoodsSaved(expected){
@@ -119,14 +129,18 @@ async function verifyFoodsSaved(expected){
 }
 async function putAndVerify(room,csv,verifyFn,expected){
   let lastError;
-  for(let attempt=1;attempt<=2;attempt++){
+  const waits=[700,1200,2200,3500];
+  for(let attempt=0;attempt<waits.length;attempt++){
     try{
       await putCsv(room,csv);
-      await new Promise(resolve=>setTimeout(resolve,350));
-      return await verifyFn(expected)
-    }catch(err){lastError=err;if(attempt<2)await new Promise(resolve=>setTimeout(resolve,700))}
+      await new Promise(resolve=>setTimeout(resolve,waits[attempt]));
+      return await verifyFn(expected);
+    }catch(err){
+      lastError=err;
+      console.warn(`EtherCalc verificare ${attempt+1}/${waits.length} eșuată.`,err);
+    }
   }
-  throw lastError
+  throw lastError;
 }
 
 function headerIndex(header,name){return header.findIndex(x=>String(x||'').trim().toLowerCase()===name)}
@@ -161,98 +175,49 @@ function parseMeals(csv){
   const header=rows[0].map(x=>String(x||'').trim().toLowerCase());
   const hasHeader=header.includes('id');
   if(!hasHeader){
-    return rows.map(r=>({id:r[0]||crypto.randomUUID(),date:r[1]||'',meal:r[2]||'Gustare',foodId:r[3]||'',foodName:r[4]||'',grams:num(r[5]),kcal:num(r[6]),fat:0,carbs:0,protein:0,fiber:0,sugar:0,note:r[7]||'',updatedAt:r[8]||''})).filter(x=>x.date&&x.foodName)
+    return rows.map(r=>({
+      id:r[0]||crypto.randomUUID(),date:r[1]||'',meal:r[2]||'Gustare',
+      foodId:r[3]||'',foodName:r[4]||'',grams:num(r[5]),kcal:num(r[6]),
+      fat:0,carbs:0,protein:0,fiber:0,sugar:0,note:r[7]||'',
+      updatedAt:r[8]||'',deleted:false
+    })).filter(x=>x.id)
   }
   const ix=n=>headerIndex(header,n);
   return rows.slice(1).map(r=>({
-    id:r[ix('id')]||crypto.randomUUID(),date:r[ix('date')]||'',meal:r[ix('meal')]||'Gustare',
-    foodId:r[ix('food_id')]||'',foodName:r[ix('food_name')]||'',grams:num(r[ix('grams')]),kcal:num(r[ix('kcal')]),
-    fat:ix('fat')>=0?num(r[ix('fat')]):0,carbs:ix('carbs')>=0?num(r[ix('carbs')]):0,protein:ix('protein')>=0?num(r[ix('protein')]):0,
-    fiber:ix('fiber')>=0?num(r[ix('fiber')]):0,sugar:ix('sugar')>=0?num(r[ix('sugar')]):0,
-    note:ix('note')>=0?(r[ix('note')]||''):'',updatedAt:ix('updated_at')>=0?(r[ix('updated_at')]||''):''
-  })).filter(x=>x.date&&x.foodName)
+    id:r[ix('id')]||crypto.randomUUID(),
+    date:ix('date')>=0?(r[ix('date')]||''):'',
+    meal:ix('meal')>=0?(r[ix('meal')]||'Gustare'):'Gustare',
+    foodId:ix('food_id')>=0?(r[ix('food_id')]||''):'',
+    foodName:ix('food_name')>=0?(r[ix('food_name')]||''):'',
+    grams:ix('grams')>=0?num(r[ix('grams')]):0,
+    kcal:ix('kcal')>=0?num(r[ix('kcal')]):0,
+    fat:ix('fat')>=0?num(r[ix('fat')]):0,
+    carbs:ix('carbs')>=0?num(r[ix('carbs')]):0,
+    protein:ix('protein')>=0?num(r[ix('protein')]):0,
+    fiber:ix('fiber')>=0?num(r[ix('fiber')]):0,
+    sugar:ix('sugar')>=0?num(r[ix('sugar')]):0,
+    note:ix('note')>=0?(r[ix('note')]||''):'',
+    updatedAt:ix('updated_at')>=0?(r[ix('updated_at')]||''):'',
+    deleted:ix('deleted')>=0?String(r[ix('deleted')]||'').toLowerCase()==='true':false
+  })).filter(x=>x.id)
 }
-function mealsCsv(){return rowsToCsv([['id','date','meal','food_id','food_name','grams','kcal','fat','carbs','protein','fiber','sugar','note','updated_at'],...state.meals.slice().sort((a,b)=>(a.date+a.meal).localeCompare(b.date+b.meal)).map(m=>[m.id,m.date,m.meal,m.foodId,m.foodName,m.grams,m.kcal,round1(m.fat),round1(m.carbs),round1(m.protein),round1(m.fiber),round1(m.sugar),m.note,m.updatedAt])])}
-
-
-function loadMealShadow(){
-  try{
-    const raw=localStorage.getItem(MEAL_SHADOW_KEY);
-    const list=raw?JSON.parse(raw):[];
-    return Array.isArray(list)?list.filter(x=>x&&x.id&&x.date):[];
-  }catch(e){console.warn('Shadow jurnal invalid.',e);return[]}
-}
-function loadDeletedMealIds(){
-  try{
-    const raw=localStorage.getItem(MEAL_DELETED_KEY);
-    const list=raw?JSON.parse(raw):[];
-    return new Set(Array.isArray(list)?list:[]);
-  }catch(e){return new Set()}
-}
-function persistMealShadow(){
-  try{
-    localStorage.setItem(MEAL_SHADOW_KEY,JSON.stringify(state.meals));
-    localStorage.setItem(MEAL_DELETED_KEY,JSON.stringify([...state.deletedMealIds]));
-  }catch(e){console.warn('Nu am putut salva shadow-ul local.',e)}
-}
-function mergeMealCollections(remote,local){
-  const out=new Map();
-  (remote||[]).forEach(r=>{
-    if(r?.id&&!state.deletedMealIds.has(r.id))out.set(r.id,r)
-  });
-  (local||[]).forEach(l=>{
-    if(!l?.id||state.deletedMealIds.has(l.id))return;
-    const r=out.get(l.id);
-    if(!r||recordTime(l)>=recordTime(r))out.set(l.id,l)
-  });
-  return [...out.values()];
+function mealsCsv(records=state.meals){
+  return rowsToCsv([
+    ['id','date','meal','food_id','food_name','grams','kcal','fat','carbs','protein','fiber','sugar','note','updated_at','deleted'],
+    ...records.slice().sort((a,b)=>String(a.id).localeCompare(String(b.id))).map(m=>[
+      m.id,m.date,m.meal,m.foodId,m.foodName,m.grams,m.kcal,
+      round1(m.fat),round1(m.carbs),round1(m.protein),
+      round1(m.fiber),round1(m.sugar),m.note,m.updatedAt,!!m.deleted
+    ])
+  ])
 }
 
-const RECENT_LOCAL_GRACE_MS = 120000;
-
-function recordTime(record){
-  const t=Date.parse(record?.updatedAt||'');
-  return Number.isFinite(t)?t:0;
-}
-
-function mergeRemoteWithRecentLocal(remote,local){
-  const now=Date.now();
-  const out=new Map((remote||[]).map(r=>[r.id,r]));
-
-  (local||[]).forEach(localRecord=>{
-    if(!localRecord?.id)return;
-
-    const remoteRecord=out.get(localRecord.id);
-    const localTime=recordTime(localRecord);
-    const remoteTime=recordTime(remoteRecord);
-
-    if(remoteRecord){
-      // Nu lăsăm un snapshot remote mai vechi să suprascrie o modificare locală mai nouă.
-      if(localTime>remoteTime)out.set(localRecord.id,localRecord);
-      return;
-    }
-
-    // EtherCalc poate răspunde pentru scurt timp cu versiunea anterioară după un PUT.
-    // Păstrăm înregistrările locale foarte recente ca să nu "dispară" din aplicație.
-    if(localTime && now-localTime<RECENT_LOCAL_GRACE_MS){
-      out.set(localRecord.id,localRecord);
-    }
-  });
-
-  return [...out.values()];
-}
-
-function sameCollectionByVersion(a,b){
-  const sig=list=>(list||[])
-    .map(x=>`${x.id}|${x.updatedAt||''}`)
-    .sort()
-    .join('\n');
-  return sig(a)===sig(b);
+function sameCollectionExact(a,b){
+  return (a||[]).length===(b||[]).length && collectionSignature(a)===collectionSignature(b);
 }
 
 async function seedFoodsIfNeeded(){if(state.foods.length)return;const now=new Date().toISOString();state.foods=DEFAULT_FOODS.map(([name,kcal100,fat100,carbs100,protein100,fiber100,sugar100,category])=>({id:crypto.randomUUID(),name,kcal100,fat100,carbs100,protein100,fiber100,sugar100,category,updatedAt:now}));await putCsv(FOOD_ROOM,foodsCsv());showToast('Am adăugat lista implicită de alimente în EtherCalc.')}
 async function syncAll({notify=false}={}){
-  // Un refresh remote nu are voie să ruleze peste o salvare aflată în curs.
   if(state.syncing||state.savingMeals||state.savingFoods)return;
 
   state.syncing=true;
@@ -263,12 +228,9 @@ async function syncAll({notify=false}={}){
     const remoteFoods=parseFoods(foodCsv);
     const remoteMeals=parseMeals(mealCsv);
 
-    const mergedFoods=mergeRemoteWithRecentLocal(remoteFoods,state.foods);
-    const mergedMeals=mergeMealCollections(remoteMeals,state.meals);
-
-    state.foods=mergedFoods;
-    state.meals=mergedMeals;
-    persistMealShadow();
+    // EtherCalc este sursa unică de adevăr pentru jurnal.
+    state.foods=remoteFoods;
+    state.meals=remoteMeals;
 
     await seedFoodsIfNeeded();
 
@@ -284,27 +246,13 @@ async function syncAll({notify=false}={}){
     }
 
     renderAll();
-
-    // Dacă remote-ul a venit cu o versiune veche imediat după o salvare,
-    // păstrăm local datele și le rescriem pentru auto-reparare.
-    if(
-      state.meals.length &&
-      !sameCollectionByVersion(remoteMeals,state.meals)
-    ){
-      state.savingMeals=true;
-      try{
-        await putCsv(LOG_ROOM,mealsCsv());
-      }finally{
-        state.savingMeals=false;
-      }
-    }
-
-    setSync(`Sincronizat ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit'})}`,'ok');
-    if(notify)showToast('Date sincronizate.');
+    const activeMeals=state.meals.filter(m=>!m.deleted).length;
+    setSync(`EtherCalc ✓ · ${activeMeals} înregistrări · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit',timeZone:APP_TIMEZONE})}`,'ok');
+    if(notify)showToast('Datele au fost recitite din EtherCalc.');
   }catch(e){
     console.error(e);
-    setSync('Eroare de conectare','error');
-    if(notify)showToast('Nu am putut sincroniza cu EtherCalc.');
+    setSync('Eroare EtherCalc','error');
+    if(notify)showToast(`Sincronizarea a eșuat: ${e.message}`);
   }finally{
     state.syncing=false;
   }
@@ -319,7 +267,7 @@ async function saveFoods(){
 
   try{
     const verified=await putAndVerify(FOOD_ROOM,foodsCsv(),verifyFoodsSaved,snapshot);
-    state.foods=mergeRemoteWithRecentLocal(verified,snapshot);
+    state.foods=verified;
     state.lastFoodSaveAt=Date.now();
     renderAll();
     setSync('Baza de alimente salvată și verificată','ok');
@@ -331,59 +279,55 @@ async function saveFoods(){
 async function saveMeals(){
   if(state.savingMeals)return;
   state.savingMeals=true;
-  setSync('Se salvează jurnalul…');
+  setSync('Se sincronizează jurnalul cu EtherCalc…');
 
-  const snapshot=state.meals.map(x=>({...x}));
-  persistMealShadow();
+  const localDesired=state.meals.map(x=>({...x}));
+  let lastError;
 
   try{
-    const verified=await putAndVerify(LOG_ROOM,mealsCsv(),verifyMealsSaved,snapshot);
-
-    // Chiar dacă EtherCalc întoarce temporar un snapshot mai vechi,
-    // snapshot-ul local tocmai salvat rămâne sursa adevărului.
-    state.meals=mergeMealCollections(verified,snapshot);
-    persistMealShadow();
-    state.lastMealSaveAt=Date.now();
-    renderAll();
-    setSync('Jurnal salvat și verificat','ok');
-
-    // Confirmare întârziată: eventual-consistency safe.
-    setTimeout(async()=>{
-      if(state.savingMeals||state.syncing)return;
+    for(let attempt=0;attempt<4;attempt++){
       try{
-        const remote=parseMeals(await getCsv(LOG_ROOM));
-        const merged=mergeMealCollections(remote,state.meals);
+        const remoteBefore=parseMeals(await getCsv(LOG_ROOM));
+        const candidate=mergeMealRecords(remoteBefore,localDesired);
 
-        if(!sameCollectionByVersion(remote,merged)){
-          state.savingMeals=true;
-          try{
-            await putCsv(LOG_ROOM,rowsToCsv([
-              ['id','date','meal','food_id','food_name','grams','kcal','fat','carbs','protein','fiber','sugar','note','updated_at'],
-              ...merged.slice().sort((a,b)=>(a.date+a.meal).localeCompare(b.date+b.meal)).map(m=>[
-                m.id,m.date,m.meal,m.foodId,m.foodName,m.grams,m.kcal,
-                round1(m.fat),round1(m.carbs),round1(m.protein),
-                round1(m.fiber),round1(m.sugar),m.note,m.updatedAt
-              ])
-            ]));
-          }finally{
-            state.savingMeals=false;
-          }
+        await putCsv(LOG_ROOM,mealsCsv(candidate));
+        await new Promise(resolve=>setTimeout(resolve,[700,1200,2000,3200][attempt]));
+
+        const remoteAfter=parseMeals(await getCsv(LOG_ROOM));
+        const converged=mergeMealRecords(remoteAfter,candidate);
+
+        if(sameCollectionExact(remoteAfter,converged)){
+          state.meals=remoteAfter;
+          state.lastMealSaveAt=Date.now();
+          renderAll();
+          const active=state.meals.filter(m=>!m.deleted).length;
+          setSync(`EtherCalc ✓ · ${active} înregistrări`,'ok');
+          return remoteAfter;
         }
 
-        state.meals=merged;
-        persistMealShadow();
-        renderAll();
+        state.meals=converged;
+        lastError=new Error('Jurnalul a fost modificat simultan de pe alt device.');
       }catch(err){
-        console.warn('Confirmarea întârziată EtherCalc a eșuat.',err);
+        lastError=err;
+        console.warn(`Salvare jurnal ${attempt+1}/4`,err);
       }
-    },5000);
-
+    }
+    throw lastError||new Error('Jurnalul nu a putut fi sincronizat.');
+  }catch(err){
+    try{
+      state.meals=parseMeals(await getCsv(LOG_ROOM));
+      renderAll();
+    }catch(readErr){
+      console.error('Recitirea EtherCalc a eșuat.',readErr);
+    }
+    setSync('Jurnalul NU este sincronizat','error');
+    throw err;
   }finally{
     state.savingMeals=false;
   }
 }
 
-function mealsFor(date){return state.meals.filter(m=>m.date===date)}
+function mealsFor(date){return state.meals.filter(m=>!m.deleted&&m.date===date)}
 function caloriesFor(date){return Math.round(mealsFor(date).reduce((s,m)=>s+m.kcal,0))}
 function selectedFood(){return state.foods.find(f=>f.id===el.mealFood.value)}
 function nutrientsFor(food,grams){const factor=(Number(grams)||0)/100;return {kcal:Math.round((food?.kcal100||0)*factor),fat:round1((food?.fat100||0)*factor),carbs:round1((food?.carbs100||0)*factor),protein:round1((food?.protein100||0)*factor),fiber:round1((food?.fiber100||0)*factor),sugar:round1((food?.sugar100||0)*factor)}}
@@ -504,8 +448,70 @@ function renderAll(){renderFoodSelect();renderSummary();renderDiary();renderCale
 function selectDate(iso){state.selectedDate=iso;const d=fromISO(iso);state.calendarMonth=new Date(d.getFullYear(),d.getMonth(),1);renderAll()}
 function openMeal(id=''){el.mealForm.reset();el.mealId.value='';el.mealGrams.value=100;el.mealDialogTitle.textContent='Adaugă aliment';renderFoodSelect();if(id){const m=state.meals.find(x=>x.id===id);if(!m)return;el.mealId.value=m.id;el.mealFood.value=m.foodId;el.mealGrams.value=m.grams;el.mealType.value=m.meal;el.mealNote.value=m.note;el.mealDialogTitle.textContent='Editează aliment'}calcPreview();el.mealDialog.showModal()}
 function openFood(id=''){el.foodForm.reset();el.foodId.value='';el.foodDialogTitle.textContent='Adaugă aliment';el.deleteFood.hidden=true;if(id){const f=state.foods.find(x=>x.id===id);if(!f)return;el.foodId.value=f.id;el.foodName.value=f.name;el.foodCalories.value=f.kcal100;el.foodFat.value=round1(f.fat100);el.foodCarbs.value=round1(f.carbs100);el.foodProtein.value=round1(f.protein100);el.foodFiber.value=round1(f.fiber100);el.foodSugar.value=round1(f.sugar100);el.foodCategory.value=f.category;el.foodDialogTitle.textContent='Editează aliment';el.deleteFood.hidden=false}el.foodDialog.showModal()}
-async function deleteMeal(id){state.deletedMealIds.add(id);state.meals=state.meals.filter(m=>m.id!==id);persistMealShadow();renderAll();try{await saveMeals();showToast('Înregistrare ștearsă.')}catch(e){console.error(e);showToast(`Ștergerea nu a putut fi salvată: ${e.message}`)}}
-async function handleMealSubmit(e){e.preventDefault();const f=selectedFood(),grams=Number(el.mealGrams.value);if(!f||!grams||grams<1){showToast('Alege alimentul și introdu cantitatea.');return}const id=el.mealId.value||crypto.randomUUID(),existing=state.meals.find(m=>m.id===id),n=nutrientsFor(f,grams),record={id,date:existing?.date||state.selectedDate,meal:el.mealType.value,foodId:f.id,foodName:f.name,grams,kcal:n.kcal,fat:n.fat,carbs:n.carbs,protein:n.protein,fiber:n.fiber,sugar:n.sugar,note:el.mealNote.value.trim(),updatedAt:new Date().toISOString()};state.deletedMealIds.delete(id);state.meals=existing?state.meals.map(m=>m.id===id?record:m):[...state.meals,record];persistMealShadow();el.mealDialog.close();renderAll();try{await saveMeals();showToast(existing?'Înregistrare actualizată.':'Aliment adăugat.')}catch(err){console.error(err);showToast(`Salvarea a eșuat: ${err.message}`)}}
+async function deleteMeal(id){
+  const existing=state.meals.find(m=>m.id===id);
+  if(!existing)return;
+  const before=state.meals.map(x=>({...x}));
+  const tombstone={...existing,deleted:true,updatedAt:new Date().toISOString()};
+  state.meals=state.meals.map(m=>m.id===id?tombstone:m);
+  renderAll();
+  try{
+    await saveMeals();
+    showToast('Înregistrare ștearsă și sincronizată.');
+  }catch(e){
+    console.error(e);
+    state.meals=before;
+    renderAll();
+    showToast(`Ștergerea a eșuat: ${e.message}`);
+  }
+}
+async function handleMealSubmit(e){
+  e.preventDefault();
+  const f=selectedFood(),grams=Number(el.mealGrams.value);
+  if(!f||!grams||grams<1){
+    showToast('Alege alimentul și introdu cantitatea.');
+    return;
+  }
+
+  const id=el.mealId.value||crypto.randomUUID();
+  const existing=state.meals.find(m=>m.id===id);
+  const n=nutrientsFor(f,grams);
+  const record={
+    id,
+    date:existing?.date||state.selectedDate,
+    meal:el.mealType.value,
+    foodId:f.id,
+    foodName:f.name,
+    grams,
+    kcal:n.kcal,
+    fat:n.fat,
+    carbs:n.carbs,
+    protein:n.protein,
+    fiber:n.fiber,
+    sugar:n.sugar,
+    note:el.mealNote.value.trim(),
+    updatedAt:new Date().toISOString(),
+    deleted:false
+  };
+
+  const before=state.meals.map(x=>({...x}));
+  state.meals=existing
+    ? state.meals.map(m=>m.id===id?record:m)
+    : [...state.meals,record];
+
+  el.mealDialog.close();
+  renderAll();
+
+  try{
+    await saveMeals();
+    showToast(existing?'Înregistrare actualizată în EtherCalc.':'Aliment salvat în EtherCalc.');
+  }catch(err){
+    console.error(err);
+    state.meals=before;
+    renderAll();
+    showToast(`Salvarea a eșuat: ${err.message}`);
+  }
+}
 async function handleFoodSubmit(e){e.preventDefault();const name=el.foodName.value.trim(),kcal=Number(el.foodCalories.value),fat=Number(el.foodFat.value||0),carbs=Number(el.foodCarbs.value||0),protein=Number(el.foodProtein.value||0),fiber=Number(el.foodFiber.value||0),sugar=Number(el.foodSugar.value||0);if(!name||![kcal,fat,carbs,protein,fiber,sugar].every(Number.isFinite)||[kcal,fat,carbs,protein,fiber,sugar].some(v=>v<0)){showToast('Completează corect valorile nutriționale.');return}const id=el.foodId.value||crypto.randomUUID(),existing=state.foods.find(f=>f.id===id),record={id,name,kcal100:round1(kcal),fat100:round1(fat),carbs100:round1(carbs),protein100:round1(protein),fiber100:round1(fiber),sugar100:round1(sugar),category:el.foodCategory.value.trim(),updatedAt:new Date().toISOString()};state.foods=existing?state.foods.map(f=>f.id===id?record:f):[...state.foods,record];el.foodDialog.close();renderAll();try{await saveFoods();showToast(existing?'Aliment actualizat în mapare.':'Aliment adăugat în mapare.')}catch(err){console.error(err);showToast(`Maparea nu a putut fi salvată: ${err.message}`)}}
 async function handleDeleteFood(){const id=el.foodId.value,f=state.foods.find(x=>x.id===id);if(!f)return;if(state.meals.some(m=>m.foodId===id)){showToast('Alimentul este folosit în jurnal. Îl poți edita, dar nu șterge.');return}state.foods=state.foods.filter(x=>x.id!==id);el.foodDialog.close();renderAll();try{await saveFoods();showToast('Aliment șters din mapare.')}catch(err){console.error(err);showToast(`Ștergerea nu a putut fi salvată: ${e.message}`)}}
 let toastTimer;function showToast(msg){clearTimeout(toastTimer);el.toast.textContent=msg;el.toast.classList.add('show');toastTimer=setTimeout(()=>el.toast.classList.remove('show'),2800)}
@@ -575,16 +581,10 @@ el.foodCsvInput.addEventListener('change',async()=>{
 el.syncButton.onclick=()=>syncAll({notify:true});el.prevDay.onclick=()=>selectDate(addDays(state.selectedDate,-1));el.nextDay.onclick=()=>selectDate(addDays(state.selectedDate,1));el.openDatePicker.onclick=()=>{try{el.datePicker.showPicker()}catch(_){el.datePicker.click()}};el.datePicker.addEventListener('change',()=>el.datePicker.value&&selectDate(el.datePicker.value));el.todayButton.onclick=()=>selectDate(todayISO());el.exportMonthExcel.onclick=exportMonthToExcel;el.prevMonth.onclick=()=>{state.calendarMonth=new Date(state.calendarMonth.getFullYear(),state.calendarMonth.getMonth()-1,1);renderCalendar()};el.nextMonth.onclick=()=>{state.calendarMonth=new Date(state.calendarMonth.getFullYear(),state.calendarMonth.getMonth()+1,1);renderCalendar()};
 window.addEventListener('resize',()=>requestAnimationFrame(drawChart));
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden && Date.now()-state.lastMealSaveAt>8000 && Date.now()-state.lastFoodSaveAt>8000)syncAll()
+  if(!document.hidden)syncAll({notify:false});
 });
 window.addEventListener('online',()=>syncAll({notify:true}));
 setInterval(()=>{
-  if(
-    !document.hidden &&
-    !state.savingMeals &&
-    !state.savingFoods &&
-    Date.now()-state.lastMealSaveAt>8000 &&
-    Date.now()-state.lastFoodSaveAt>8000
-  )syncAll()
+  if(!document.hidden&&!state.savingMeals&&!state.savingFoods)syncAll({notify:false});
 },SYNC_MS);
-state.deletedMealIds=loadDeletedMealIds();state.meals=mergeMealCollections([],loadMealShadow());renderAll();syncAll();
+renderAll();syncAll({notify:false});
