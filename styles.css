@@ -156,3 +156,70 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:inherit}button,a,
   .food-header-actions{width:100%}
   .food-header-actions .button{flex:1}
 }
+
+
+/* v14 — rezumat nutrițional secundar lângă totalul caloric */
+.target-wrap--nutrition{min-width:420px}
+.daily-nutrition{
+  width:min(560px,52vw);
+  display:grid;
+  grid-template-columns:repeat(5,minmax(74px,1fr));
+  gap:.42rem;
+  margin-top:.8rem;
+}
+.daily-nutrition__item{
+  min-width:0;
+  padding:.62rem .55rem;
+  border:1px solid var(--line);
+  border-radius:13px;
+  background:rgba(255,255,255,.78);
+  text-align:left;
+  transition:.2s ease;
+}
+.daily-nutrition__item span,.daily-nutrition__item strong,.daily-nutrition__item small{display:block}
+.daily-nutrition__item span{
+  color:var(--muted);
+  font-size:.58rem;
+  font-weight:850;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.daily-nutrition__item strong{margin:.16rem 0 .12rem;font-size:.82rem;line-height:1}
+.daily-nutrition__item strong b{font-size:1rem}
+.daily-nutrition__item small{color:#969daf;font-size:.52rem;line-height:1.25}
+.daily-nutrition__item.is-good{border-color:rgba(54,168,117,.24);background:rgba(238,250,244,.9)}
+.daily-nutrition__item.is-low{border-color:rgba(214,157,54,.22);background:rgba(255,248,232,.86)}
+.daily-nutrition__item.is-high{border-color:rgba(224,126,60,.28);background:rgba(255,241,231,.9)}
+.daily-nutrition__item.is-neutral{border-color:rgba(101,87,232,.16);background:rgba(248,247,255,.88)}
+.nutrition-reference-note{
+  width:min(560px,52vw);
+  margin:.45rem 0 0;
+  color:#8e95a8;
+  font-size:.52rem;
+  line-height:1.35;
+  text-align:left;
+}
+.nutrition-reference-note strong{color:#747b91}
+
+@media(max-width:1180px){
+  .hero-card{grid-template-columns:minmax(0,1fr) minmax(420px,auto)}
+  .hero-card__side{grid-column:1/-1}
+  .daily-nutrition,.nutrition-reference-note{width:min(560px,100%)}
+}
+@media(max-width:720px){
+  .target-wrap--nutrition{display:block;min-width:0;text-align:center}
+  .target-wrap--nutrition .target-ring{margin:0 auto}
+  .target-wrap--nutrition .target-percent{margin-top:.5rem;text-align:center}
+  .daily-nutrition{width:100%;grid-template-columns:repeat(2,1fr);margin-top:.85rem}
+  .daily-nutrition__item:last-child{grid-column:1/-1}
+  .nutrition-reference-note{width:100%;text-align:left}
+}
+
+/* v15 — căutare aliment în dialogul de jurnal */
+#mealFoodSearch{
+  width:100%;
+}
+#mealFoodSearch::placeholder{
+  color:#a1a7b4;
+}

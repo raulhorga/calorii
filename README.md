@@ -1,52 +1,145 @@
-# Calorie Compass — tracker de calorii cu EtherCalc
+# Calorie Compass
 
-Aplicație statică HTML/CSS/JS pentru urmărirea caloriilor zilnice, construită pornind de la mecanismul de sincronizare EtherCalc din proiectul inițial.
+Aplicație web statică pentru urmărirea caloriilor și a valorilor nutriționale, cu sincronizare prin EtherCalc.
 
-## Surse EtherCalc
+## EtherCalc
 
-- **Jurnal calorii:** https://ethercalc.net/=5ybwphczduwg
-- **Mapare alimente:** https://ethercalc.net/=yve145gi1nxa
+- Jurnal zilnic: `https://ethercalc.net/=5pnc2i51phgo`
+- Bază de alimente: `https://ethercalc.net/=yve145gi1nxa`
+- Țintă calorică zilnică: **1800 kcal**
 
-Aplicația citește CSV din EtherCalc și salvează modificările prin `PUT` către foaia corespunzătoare.
+## Funcții principale
 
-## Funcții
+- calendar pentru selectarea zilei;
+- jurnal zilnic pentru Mic dejun, Prânz, Cină și Gustare;
+- adăugare, editare și ștergere înregistrări;
+- sincronizare cu EtherCalc;
+- grafic caloric;
+- export lunar în Excel;
+- bază de alimente editabilă;
+- import masiv de alimente din CSV;
+- interfață responsive.
 
-- calendar lunar pentru alegerea zilei;
-- jurnal pe mese: Mic dejun, Prânz, Cină, Gustare;
-- selectare aliment + cantitate în grame;
-- calcul automat `kcal = kcal/100g × grame / 100`;
-- țintă zilnică fixată la **1800 kcal**;
-- indicator vizual pentru zilele în obiectiv și zilele cu depășire;
-- grafic pentru ultimele 14 zile, cu linie de țintă la 1800 kcal;
-- medie calorică pe ultimele 7 zile;
-- bază de alimente editabilă direct din aplicație;
-- salvare automată a mapării alimentelor în EtherCalc;
-- listă implicită de alimente creată automat dacă foaia de mapare este goală;
-- sincronizare automată la 15 secunde, la revenirea în tab și la reconectarea la internet;
-- layout responsive pentru desktop și mobil.
+## Valori nutriționale
 
-## Format jurnal calorii
+Pentru fiecare aliment sunt urmărite, per 100 g:
 
-Coloane:
+- calorii;
+- grăsimi;
+- carbohidrați;
+- proteine;
+- fibre;
+- zahăr.
 
-`id,date,meal,food_id,food_name,grams,kcal,note,updated_at`
+Aplicația calculează automat valorile pentru cantitatea consumată.
 
-## Format mapare alimente
+## Rezumat nutrițional zilnic
 
-Coloane:
+În partea de sus sunt afișate totalurile zilnice pentru:
 
-`id,name,kcal_per_100g,category,updated_at`
+- calorii;
+- grăsimi;
+- carbohidrați;
+- proteine;
+- fibre;
+- zahăr total.
 
-## Lista implicită
+Reperele generale folosite pentru o țintă de 1800 kcal sunt:
 
-Include alimente uzuale precum orez, paste, pâine, ovăz, cartofi, pui, curcan, vită, somon, ton, ou, lactate, fructe, legume, nuci, ulei de măsline, ciocolată, înghețată și pizza.
+- grăsimi: aproximativ **30–60 g/zi**;
+- carbohidrați: aproximativ **203–338 g/zi**;
+- proteine: aproximativ **45–68 g/zi**;
+- fibre: minimum **25 g/zi**;
+- zahăr liber: sub aproximativ **45 g/zi**, ideal sub aproximativ **23 g/zi**.
 
-Valorile calorice sunt valori orientative per 100 g și pot fi editate oricând din interfață. Pentru etichete nutriționale exacte, actualizează valorile conform produsului consumat.
+Notă: aplicația urmărește zahărul total. Limita WHO este pentru zahăr liber.
 
-## Publicare
+## Căutare aliment în jurnal
 
-Pune `index.html`, `styles.css`, `app.js` și `README.md` în același repository și publică prin GitHub Pages sau orice hosting static.
+În fereastra **„Adaugă aliment”** există câmpul **„Caută aliment”**.
 
-## Notă despre EtherCalc
+Pe măsură ce tastezi:
 
-EtherCalc este convenabil pentru un proiect personal, dar foile publice nu sunt potrivite pentru informații sensibile. Nu stoca date medicale sau alte date private în aceste foi.
+1. lista de alimente este filtrată instantaneu;
+2. selectezi alimentul dorit;
+3. introduci cantitatea;
+4. aplicația calculează automat caloriile și nutrienții;
+5. înregistrarea este salvată în jurnalul EtherCalc.
+
+## Import masiv al bazei de alimente
+
+Butonul **„Importă CSV”** permite încărcarea în masă a alimentelor.
+
+Structura recomandată:
+
+```text
+id,name,kcal_per_100g,fat_per_100g,carbs_per_100g,protein_per_100g,fiber_per_100g,sugar_per_100g,category,updated_at
+```
+
+Alimentele noi sunt adăugate, iar cele existente cu aceeași denumire sunt actualizate.
+
+## Export lunar Excel
+
+Exportul lunar creează un fișier `.xlsx` cu:
+
+- foaie de detaliu;
+- rezumat zilnic;
+- calorii;
+- grăsimi;
+- carbohidrați;
+- proteine;
+- fibre;
+- zahăr;
+- comparație cu ținta calorică.
+
+## Sincronizare și date
+
+Jurnalul folosește foaia EtherCalc:
+
+`5pnc2i51phgo`
+
+Aplicația normalizează datele venite din EtherCalc pentru ca aceeași zi să fie recunoscută corect indiferent de formatul întors de spreadsheet.
+
+Timezone aplicație:
+
+`Europe/Bucharest`
+
+## Istoric update-uri
+
+### v7
+- import masiv CSV pentru baza de alimente;
+- bază extinsă cu calorii și macronutrienți.
+
+### v12
+- jurnal mutat pe noua foaie EtherCalc `5pnc2i51phgo`.
+
+### v13
+- corectarea formatelor de dată venite din EtherCalc;
+- jurnalul zilnic rămâne vizibil după sincronizare.
+
+### v14
+- rezumat nutrițional în partea de sus;
+- afișare grăsimi, carbohidrați, proteine, fibre și zahăr;
+- repere generale zilnice raportate la 1800 kcal.
+
+### v15
+- câmp de căutare în dialogul „Adaugă aliment”;
+- filtrare live a listei de alimente;
+- focus automat pe căutare când se deschide dialogul.
+
+## Publicare pe GitHub Pages
+
+Redenumește fișierele:
+
+- `calorie_compass_v15_food_search_index.html.txt` → `index.html`
+- `calorie_compass_v15_food_search_styles.css.txt` → `styles.css`
+- `calorie_compass_v15_food_search_app.js.txt` → `app.js`
+- `calorie_compass_v15_README.md.txt` → `README.md`
+
+Apoi înlocuiește fișierele din repository și publică prin GitHub Pages.
+
+
+### v16
+- corectare eroare UI `Cannot set properties of undefined (setting 'textContent')`;
+- adăugată referința DOM lipsă pentru `targetPercent`;
+- fără modificări la sincronizarea EtherCalc sau la logica jurnalului.

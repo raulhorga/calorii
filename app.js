@@ -64,9 +64,12 @@ const state = {
 const $ = s => document.querySelector(s);
 const el = {
   syncStatus:$('#syncStatus'), syncButton:$('#syncButton'), selectedDateLabel:$('#selectedDateLabel'), datePicker:$('#datePicker'), openDatePicker:$('#openDatePicker'), prevDay:$('#prevDay'), nextDay:$('#nextDay'),
-  dailyCalories:$('#dailyCalories'), targetRing:$('#targetRing'), dayStatus:$('#dayStatus'), remainingText:$('#remainingText'), metricCalories:$('#metricCalories'), metricItems:$('#metricItems'), metricMeal:$('#metricMeal'), metricMealSub:$('#metricMealSub'), metricAverage:$('#metricAverage'),
+  dailyCalories:$('#dailyCalories'), targetRing:$('#targetRing'), targetPercent:$('#targetPercent'),
+  dailyFat:$('#dailyFat'), dailyCarbs:$('#dailyCarbs'), dailyProtein:$('#dailyProtein'), dailyFiber:$('#dailyFiber'), dailySugar:$('#dailySugar'),
+  dailyFatCard:$('#dailyFatCard'), dailyCarbsCard:$('#dailyCarbsCard'), dailyProteinCard:$('#dailyProteinCard'), dailyFiberCard:$('#dailyFiberCard'), dailySugarCard:$('#dailySugarCard'),
+  dayStatus:$('#dayStatus'), remainingText:$('#remainingText'), metricCalories:$('#metricCalories'), metricItems:$('#metricItems'), metricMeal:$('#metricMeal'), metricMealSub:$('#metricMealSub'), metricAverage:$('#metricAverage'),
   calendarTitle:$('#calendarTitle'), calendarGrid:$('#calendarGrid'), prevMonth:$('#prevMonth'), nextMonth:$('#nextMonth'), todayButton:$('#todayButton'), exportMonthExcel:$('#exportMonthExcel'), chart:$('#calorieChart'), mealGroups:$('#mealGroups'), emptyDiary:$('#emptyDiary'),
-  mealDialog:$('#mealDialog'), mealForm:$('#mealForm'), mealId:$('#mealId'), mealFood:$('#mealFood'), mealGrams:$('#mealGrams'), mealType:$('#mealType'), mealNote:$('#mealNote'), mealPreview:$('#mealCaloriesPreview'), mealFatPreview:$('#mealFatPreview'), mealCarbsPreview:$('#mealCarbsPreview'), mealProteinPreview:$('#mealProteinPreview'), mealFiberPreview:$('#mealFiberPreview'), mealSugarPreview:$('#mealSugarPreview'), mealDialogTitle:$('#mealDialogTitle'),
+  mealDialog:$('#mealDialog'), mealForm:$('#mealForm'), mealId:$('#mealId'), mealFoodSearch:$('#mealFoodSearch'), mealFood:$('#mealFood'), mealGrams:$('#mealGrams'), mealType:$('#mealType'), mealNote:$('#mealNote'), mealPreview:$('#mealCaloriesPreview'), mealFatPreview:$('#mealFatPreview'), mealCarbsPreview:$('#mealCarbsPreview'), mealProteinPreview:$('#mealProteinPreview'), mealFiberPreview:$('#mealFiberPreview'), mealSugarPreview:$('#mealSugarPreview'), mealDialogTitle:$('#mealDialogTitle'),
   foodDialog:$('#foodDialog'), foodForm:$('#foodForm'), foodId:$('#foodId'), foodName:$('#foodName'), foodCalories:$('#foodCalories'), foodFat:$('#foodFat'), foodCarbs:$('#foodCarbs'), foodProtein:$('#foodProtein'), foodFiber:$('#foodFiber'), foodSugar:$('#foodSugar'), foodCategory:$('#foodCategory'), foodDialogTitle:$('#foodDialogTitle'), deleteFood:$('#deleteFood'), foodTable:$('#foodTable'), foodSearch:$('#foodSearch'), showAllFoods:$('#showAllFoods'), importFoodsCsv:$('#importFoodsCsv'), foodCsvInput:$('#foodCsvInput'), toast:$('#toast')
 };
 
@@ -514,14 +517,115 @@ async function saveMeals(){
 
 function mealsFor(date){const wanted=normalizeMealDate(date);return state.meals.filter(m=>!m.deleted&&normalizeMealDate(m.date)===wanted)}
 function caloriesFor(date){return Math.round(mealsFor(date).reduce((s,m)=>s+m.kcal,0))}
+
+const DAILY_REFERENCE = {
+  fat:{min:30,max:60},
+  carbs:{min:203,max:338},
+  protein:{min:45,max:68},
+  fiber:{min:25},
+  freeSugar:{max:45,ideal:23}
+};
+
+function nutrientsForDay(date){
+  return mealsFor(date).reduce((sum,m)=>{
+    sum.fat+=Number(m.fat)||0;
+    sum.carbs+=Number(m.carbs)||0;
+    sum.protein+=Number(m.protein)||0;
+    sum.fiber+=Number(m.fiber)||0;
+    sum.sugar+=Number(m.sugar)||0;
+    return sum;
+  },{fat:0,carbs:0,protein:0,fiber:0,sugar:0});
+}
+
+function setReferenceState(card,value,ref,{neutral=false}={}){
+  if(!card)return;
+  card.classList.remove('is-low','is-good','is-high','is-neutral');
+  if(neutral){
+    card.classList.add('is-neutral');
+    return;
+  }
+  if(ref.min!=null && value<ref.min) card.classList.add('is-low');
+  else if(ref.max!=null && value>ref.max) card.classList.add('is-high');
+  else card.classList.add('is-good');
+}
+
 function selectedFood(){return state.foods.find(f=>f.id===el.mealFood.value)}
 function nutrientsFor(food,grams){const factor=(Number(grams)||0)/100;return {kcal:Math.round((food?.kcal100||0)*factor),fat:round1((food?.fat100||0)*factor),carbs:round1((food?.carbs100||0)*factor),protein:round1((food?.protein100||0)*factor),fiber:round1((food?.fiber100||0)*factor),sugar:round1((food?.sugar100||0)*factor)}}
 function calcPreview(){const f=selectedFood(),g=Number(el.mealGrams.value)||0,n=nutrientsFor(f,g);el.mealPreview.textContent=n.kcal;el.mealFatPreview.textContent=n.fat;el.mealCarbsPreview.textContent=n.carbs;el.mealProteinPreview.textContent=n.protein;el.mealFiberPreview.textContent=n.fiber;el.mealSugarPreview.textContent=n.sugar}
-function renderFoodSelect(){const current=el.mealFood.value;el.mealFood.innerHTML='<option value="">— Alege alimentul —</option>';state.foods.slice().sort((a,b)=>a.name.localeCompare(b.name,'ro')).forEach(f=>{const o=document.createElement('option');o.value=f.id;o.textContent=`${f.name} · ${f.kcal100} kcal · P ${round1(f.protein100)}g · C ${round1(f.carbs100)}g · G ${round1(f.fat100)}g · F ${round1(f.fiber100)}g · Z ${round1(f.sugar100)}g /100g`;el.mealFood.appendChild(o)});if([...el.mealFood.options].some(o=>o.value===current))el.mealFood.value=current;calcPreview()}
+function renderFoodSelect(){
+  const current=el.mealFood.value;
+  const query=normalizeFoodKey(el.mealFoodSearch?.value||'');
+  const foods=state.foods
+    .filter(f=>!query||normalizeFoodKey(f.name).includes(query))
+    .slice()
+    .sort((a,b)=>a.name.localeCompare(b.name,'ro'));
 
-function renderSummary(){const list=mealsFor(state.selectedDate),total=caloriesFor(state.selectedDate),pct=Math.min(total/TARGET,1)*360;el.selectedDateLabel.textContent=fmtDate(state.selectedDate);el.datePicker.value=state.selectedDate;el.dailyCalories.textContent=total;el.targetRing.style.setProperty('--progress',`${pct}deg`);el.targetRing.classList.toggle('is-over',total>TARGET);el.dayStatus.textContent=total>TARGET?'Peste obiectiv':'În obiectiv';el.dayStatus.classList.toggle('is-over',total>TARGET);const diff=TARGET-total;el.remainingText.textContent=diff>=0?`Mai ai ${diff} kcal disponibile.`:`Ai depășit ținta cu ${Math.abs(diff)} kcal.`;el.metricCalories.textContent=total;el.metricItems.textContent=list.length;
- const byMeal=MEAL_ORDER.map(name=>[name,Math.round(list.filter(m=>m.meal===name).reduce((s,m)=>s+m.kcal,0))]).sort((a,b)=>b[1]-a[1]);if(byMeal[0][1]){el.metricMeal.textContent=byMeal[0][0];el.metricMealSub.textContent=`${byMeal[0][1]} kcal`}else{el.metricMeal.textContent='—';el.metricMealSub.textContent='fără înregistrări'}
- let sum=0;for(let i=0;i<7;i++)sum+=caloriesFor(addDays(state.selectedDate,-i));el.metricAverage.textContent=Math.round(sum/7)}
+  el.mealFood.innerHTML='<option value="">— Alege alimentul —</option>';
+
+  foods.forEach(f=>{
+    const o=document.createElement('option');
+    o.value=f.id;
+    o.textContent=`${f.name} · ${f.kcal100} kcal · P ${round1(f.protein100)}g · C ${round1(f.carbs100)}g · G ${round1(f.fat100)}g · F ${round1(f.fiber100)}g · Z ${round1(f.sugar100)}g /100g`;
+    el.mealFood.appendChild(o);
+  });
+
+  if([...el.mealFood.options].some(o=>o.value===current))el.mealFood.value=current;
+  calcPreview();
+}
+
+function renderSummary(){
+  const list=mealsFor(state.selectedDate);
+  const total=caloriesFor(state.selectedDate);
+  const nutrition=nutrientsForDay(state.selectedDate);
+  const pct=Math.min(total/TARGET,1)*360;
+
+  el.selectedDateLabel.textContent=fmtDate(state.selectedDate);
+  el.datePicker.value=state.selectedDate;
+  el.dailyCalories.textContent=total;
+  el.targetRing.style.setProperty('--progress',`${pct}deg`);
+  el.targetRing.classList.toggle('is-over',total>TARGET);
+  el.targetPercent.textContent=`${Math.round((total/TARGET)*100)||0}% din obiectiv`;
+
+  el.dayStatus.textContent=total>TARGET?'Peste obiectiv':'În obiectiv';
+  el.dayStatus.classList.toggle('is-over',total>TARGET);
+
+  const diff=TARGET-total;
+  el.remainingText.textContent=diff>=0
+    ?`Mai ai ${diff} kcal disponibile.`
+    :`Ai depășit ținta cu ${Math.abs(diff)} kcal.`;
+
+  el.dailyFat.textContent=round1(nutrition.fat);
+  el.dailyCarbs.textContent=round1(nutrition.carbs);
+  el.dailyProtein.textContent=round1(nutrition.protein);
+  el.dailyFiber.textContent=round1(nutrition.fiber);
+  el.dailySugar.textContent=round1(nutrition.sugar);
+
+  setReferenceState(el.dailyFatCard,nutrition.fat,DAILY_REFERENCE.fat);
+  setReferenceState(el.dailyCarbsCard,nutrition.carbs,DAILY_REFERENCE.carbs);
+  setReferenceState(el.dailyProteinCard,nutrition.protein,DAILY_REFERENCE.protein);
+  setReferenceState(el.dailyFiberCard,nutrition.fiber,DAILY_REFERENCE.fiber);
+  // Aplicația urmărește zahăr total; WHO stabilește limita pentru zahăr liber.
+  setReferenceState(el.dailySugarCard,nutrition.sugar,DAILY_REFERENCE.freeSugar,{neutral:true});
+
+  el.metricCalories.textContent=total;
+  el.metricItems.textContent=list.length;
+
+  const byMeal=MEAL_ORDER
+    .map(name=>[name,Math.round(list.filter(m=>m.meal===name).reduce((s,m)=>s+m.kcal,0))])
+    .sort((a,b)=>b[1]-a[1]);
+
+  if(byMeal[0][1]){
+    el.metricMeal.textContent=byMeal[0][0];
+    el.metricMealSub.textContent=`${byMeal[0][1]} kcal`;
+  }else{
+    el.metricMeal.textContent='—';
+    el.metricMealSub.textContent='fără înregistrări';
+  }
+
+  let sum=0;
+  for(let i=0;i<7;i++)sum+=caloriesFor(addDays(state.selectedDate,-i));
+  el.metricAverage.textContent=Math.round(sum/7);
+}
 
 function renderDiary(){const list=mealsFor(state.selectedDate);el.mealGroups.innerHTML='';el.emptyDiary.hidden=!!list.length;if(!list.length)return;MEAL_ORDER.forEach(type=>{const items=list.filter(m=>m.meal===type);if(!items.length)return;const group=document.createElement('div');group.className='meal-group';const total=Math.round(items.reduce((s,m)=>s+m.kcal,0));group.innerHTML=`<div class="meal-group__title"><strong>${type}</strong><span>${total} kcal</span></div>`;items.sort((a,b)=>a.foodName.localeCompare(b.foodName,'ro')).forEach(m=>{const row=document.createElement('div');row.className='meal-item';row.innerHTML=`<div class="meal-item__name"><strong></strong><span></span></div><div class="meal-item__kcal">${Math.round(m.kcal)} kcal</div><div class="meal-item__actions"><button class="mini-button edit" title="Editează">✎</button><button class="mini-button del" title="Șterge">×</button></div>`;row.querySelector('strong').textContent=m.foodName;row.querySelector('.meal-item__name span').innerHTML=`${m.grams} g · <b>P</b> ${round1(m.protein)}g · <b>C</b> ${round1(m.carbs)}g · <b>G</b> ${round1(m.fat)}g · <b>F</b> ${round1(m.fiber)}g · <b>Z</b> ${round1(m.sugar)}g${m.note?` · ${m.note}`:''}`;row.querySelector('.edit').onclick=()=>openMeal(m.id);row.querySelector('.del').onclick=()=>deleteMeal(m.id);group.appendChild(row)});el.mealGroups.appendChild(group)})}
 
@@ -631,7 +735,32 @@ function roundRect(ctx,x,y,w,h,r){r=Math.min(r,w/2,h/2);ctx.moveTo(x+r,y);ctx.ar
 function renderAll(){renderFoodSelect();renderSummary();renderDiary();renderCalendar();renderFoods();requestAnimationFrame(drawChart)}
 
 function selectDate(iso){state.selectedDate=iso;const d=fromISO(iso);state.calendarMonth=new Date(d.getFullYear(),d.getMonth(),1);renderAll()}
-function openMeal(id=''){el.mealForm.reset();el.mealId.value='';el.mealGrams.value=100;el.mealDialogTitle.textContent='Adaugă aliment';renderFoodSelect();if(id){const m=state.meals.find(x=>x.id===id);if(!m)return;el.mealId.value=m.id;el.mealFood.value=m.foodId;el.mealGrams.value=m.grams;el.mealType.value=m.meal;el.mealNote.value=m.note;el.mealDialogTitle.textContent='Editează aliment'}calcPreview();el.mealDialog.showModal()}
+function openMeal(id=''){
+  el.mealForm.reset();
+  el.mealId.value='';
+  el.mealGrams.value=100;
+  el.mealFoodSearch.value='';
+  el.mealDialogTitle.textContent='Adaugă aliment';
+  renderFoodSelect();
+
+  if(id){
+    const m=state.meals.find(x=>x.id===id);
+    if(!m)return;
+    el.mealId.value=m.id;
+    const food=state.foods.find(f=>f.id===m.foodId);
+    el.mealFoodSearch.value=food?.name||m.foodName||'';
+    renderFoodSelect();
+    el.mealFood.value=m.foodId;
+    el.mealGrams.value=m.grams;
+    el.mealType.value=m.meal;
+    el.mealNote.value=m.note;
+    el.mealDialogTitle.textContent='Editează aliment';
+  }
+
+  calcPreview();
+  el.mealDialog.showModal();
+  setTimeout(()=>el.mealFoodSearch.focus(),50);
+}
 function openFood(id=''){el.foodForm.reset();el.foodId.value='';el.foodDialogTitle.textContent='Adaugă aliment';el.deleteFood.hidden=true;if(id){const f=state.foods.find(x=>x.id===id);if(!f)return;el.foodId.value=f.id;el.foodName.value=f.name;el.foodCalories.value=f.kcal100;el.foodFat.value=round1(f.fat100);el.foodCarbs.value=round1(f.carbs100);el.foodProtein.value=round1(f.protein100);el.foodFiber.value=round1(f.fiber100);el.foodSugar.value=round1(f.sugar100);el.foodCategory.value=f.category;el.foodDialogTitle.textContent='Editează aliment';el.deleteFood.hidden=false}el.foodDialog.showModal()}
 async function deleteMeal(id){
   const existing=state.meals.find(m=>m.id===id);
@@ -740,7 +869,7 @@ function exportMonthToExcel(){
   showToast(`Excel pentru ${new Date(year,month,1).toLocaleDateString('ro-RO',{month:'long',year:'numeric'})} a fost generat.`);
 }
 
-$('#openMealDialog').onclick=()=>openMeal();$('#openMealDialog2').onclick=()=>openMeal();$('#emptyAdd').onclick=()=>openMeal();$('#closeMealDialog').onclick=()=>el.mealDialog.close();$('#cancelMeal').onclick=()=>el.mealDialog.close();el.mealForm.addEventListener('submit',handleMealSubmit);el.mealFood.addEventListener('change',calcPreview);el.mealGrams.addEventListener('input',calcPreview);
+$('#openMealDialog').onclick=()=>openMeal();$('#openMealDialog2').onclick=()=>openMeal();$('#emptyAdd').onclick=()=>openMeal();$('#closeMealDialog').onclick=()=>el.mealDialog.close();$('#cancelMeal').onclick=()=>el.mealDialog.close();el.mealForm.addEventListener('submit',handleMealSubmit);el.mealFoodSearch.addEventListener('input',renderFoodSelect);el.mealFood.addEventListener('change',calcPreview);el.mealGrams.addEventListener('input',calcPreview);
 $('#openFoodDialog').onclick=()=>openFood();
 $('#closeFoodDialog').onclick=()=>el.foodDialog.close();
 $('#cancelFood').onclick=()=>el.foodDialog.close();

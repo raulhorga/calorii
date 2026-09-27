@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f7f2" />
   <title>Calorie Compass</title>
-  <link rel="stylesheet" href="styles.css?v=13-date-fix" />
+  <link rel="stylesheet" href="styles.css?v=16-target-fix" />
 </head>
 <body>
   <header class="topbar">
     <div class="brand">
       <div class="brand__mark" aria-hidden="true">◒</div>
-      <div><strong>Calorie Compass <em class="version-chip">v13 DATE</em></strong><span>Jurnal alimentar simplu, vizual și prietenos.</span></div>
+      <div><strong>Calorie Compass <em class="version-chip">v16 FIX</em></strong><span>Jurnal alimentar simplu, vizual și prietenos.</span></div>
     </div>
     <div class="topbar__actions">
       <small id="syncStatus" class="sync-status">Se conectează…</small>
@@ -35,11 +35,40 @@
           <button id="nextDay" class="icon-button" type="button" aria-label="Ziua următoare">›</button>
         </div>
       </div>
-      <div class="target-wrap">
+      <div class="target-wrap target-wrap--nutrition">
         <div id="targetRing" class="target-ring" aria-label="Progres caloric">
           <div><strong id="dailyCalories">0</strong><span>din 1800 kcal</span></div>
         </div>
         <span id="targetPercent" class="target-percent">0% din obiectiv</span>
+
+        <div class="daily-nutrition" aria-label="Valori nutriționale zilnice">
+          <div class="daily-nutrition__item" id="dailyFatCard">
+            <span>Grăsimi</span>
+            <strong><b id="dailyFat">0</b> g</strong>
+            <small>reper 30–60 g</small>
+          </div>
+          <div class="daily-nutrition__item" id="dailyCarbsCard">
+            <span>Carbohidrați</span>
+            <strong><b id="dailyCarbs">0</b> g</strong>
+            <small>reper 203–338 g</small>
+          </div>
+          <div class="daily-nutrition__item" id="dailyProteinCard">
+            <span>Proteine</span>
+            <strong><b id="dailyProtein">0</b> g</strong>
+            <small>reper 45–68 g</small>
+          </div>
+          <div class="daily-nutrition__item" id="dailyFiberCard">
+            <span>Fibre</span>
+            <strong><b id="dailyFiber">0</b> g</strong>
+            <small>reper ≥25 g</small>
+          </div>
+          <div class="daily-nutrition__item daily-nutrition__item--sugar" id="dailySugarCard">
+            <span>Zahăr total</span>
+            <strong><b id="dailySugar">0</b> g</strong>
+            <small>WHO: zahăr liber &lt;45 g*</small>
+          </div>
+        </div>
+        <p class="nutrition-reference-note">* Reperul WHO este pentru <strong>zahăr liber</strong>, nu pentru zahărul total din fructe/lactate. Repere generale pentru adulți, calculate la 1800 kcal.</p>
       </div>
       <div class="hero-card__side">
         <span class="status-pill" id="dayStatus"><i></i> În obiectiv</span>
@@ -115,6 +144,7 @@
       <div class="modal__header"><div><p class="eyebrow">ÎNREGISTRARE</p><h2 id="mealDialogTitle">Adaugă aliment</h2></div><button class="icon-button" id="closeMealDialog" type="button">×</button></div>
       <input id="mealId" type="hidden" />
       <div class="form-grid">
+        <label class="field field--full"><span>Caută aliment</span><input id="mealFoodSearch" type="search" placeholder="Scrie numele alimentului..." autocomplete="off" /></label>
         <label class="field field--full"><span>Aliment *</span><select id="mealFood" required></select></label>
         <label class="field"><span>Cantitate (g) *</span><input id="mealGrams" type="number" min="1" step="1" value="100" required /></label>
         <label class="field"><span>Masă</span><select id="mealType"><option>Mic dejun</option><option>Prânz</option><option>Cină</option><option>Gustare</option></select></label>
@@ -156,6 +186,6 @@
 
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="app.js?v=13-date-fix"></script>
+  <script src="app.js?v=16-target-fix"></script>
 </body>
 </html>
