@@ -1,7 +1,7 @@
 'use strict';
 
 const TARGET = 1800;
-const LOG_ROOM = '5ybwphczduwg';
+const LOG_ROOM = '5pnc2i51phgo';
 const FOOD_ROOM = 'yve145gi1nxa';
 const ETHERCALC = 'https://ethercalc.net';
 const SYNC_MS = 15000;
@@ -312,7 +312,15 @@ async function syncAll({notify=false}={}){
 
     try{
       mealCsv=await getCsv(LOG_ROOM);
-      state.meals=parseMeals(mealCsv);
+      const remoteMeals=parseMeals(mealCsv);
+
+      // Nu lăsăm un refresh automat să șteargă imediat o masă tocmai introdusă.
+      // În primele 8 secunde după salvare, păstrăm versiunea locală dacă este mai nouă.
+      if(Date.now()-state.lastMealSaveAt<8000){
+        state.meals=mergeMealRecords(remoteMeals,state.meals);
+      }else{
+        state.meals=remoteMeals;
+      }
     }catch(err){
       mealError=err;
       console.error('Eroare jurnal EtherCalc:',err);
@@ -380,49 +388,65 @@ async function saveFoods(){
 
 async function saveMeals(){
   if(state.savingMeals)return;
-  state.savingMeals=true;
-  setSync('Se sincronizează jurnalul cu EtherCalc…');
 
-  const localDesired=state.meals.map(x=>({...x}));
-  let lastError;
+  state.savingMeals=true;
+  setSync('Se salvează jurnalul în EtherCalc…');
+
+  const localSnapshot=state.meals.map(x=>({...x}));
 
   try{
-    for(let attempt=0;attempt<4;attempt++){
+    // Citim întâi ce există deja în noua foaie de jurnal.
+    const remoteBefore=parseMeals(await getCsv(LOG_ROOM));
+
+    // Combinăm după id + updatedAt, fără să pierdem ce există deja pe server.
+    const merged=mergeMealRecords(remoteBefore,localSnapshot);
+
+    // Scriem jurnalul complet.
+    await putCsv(LOG_ROOM,mealsCsv(merged));
+
+    // EtherCalc poate avea o mică întârziere până când CSV-ul reflectă PUT-ul.
+    let verified=null;
+    let lastError=null;
+
+    for(const waitMs of [900,1600,2800,4500]){
+      await new Promise(resolve=>setTimeout(resolve,waitMs));
+
       try{
-        const remoteBefore=parseMeals(await getCsv(LOG_ROOM));
-        const candidate=mergeMealRecords(remoteBefore,localDesired);
-
-        await putCsv(LOG_ROOM,mealsCsv(candidate));
-        await new Promise(resolve=>setTimeout(resolve,[700,1200,2000,3200][attempt]));
-
         const remoteAfter=parseMeals(await getCsv(LOG_ROOM));
-        const converged=mergeMealRecords(remoteAfter,candidate);
+        const stillMissing=merged.filter(expected=>{
+          const actual=remoteAfter.find(r=>r.id===expected.id);
+          return !actual || String(actual.updatedAt||'')!==String(expected.updatedAt||'') || !!actual.deleted!==!!expected.deleted;
+        });
 
-        if(sameCollectionExact(remoteAfter,converged)){
-          state.meals=remoteAfter;
-          state.lastMealSaveAt=Date.now();
-          renderAll();
-          const active=state.meals.filter(m=>!m.deleted).length;
-          setSync(`EtherCalc ✓ · ${active} înregistrări`,'ok');
-          return remoteAfter;
+        if(stillMissing.length===0){
+          verified=remoteAfter;
+          break;
         }
 
-        state.meals=converged;
-        lastError=new Error('Jurnalul a fost modificat simultan de pe alt device.');
+        lastError=new Error(`EtherCalc nu a confirmat încă ${stillMissing.length} înregistrări.`);
       }catch(err){
         lastError=err;
-        console.warn(`Salvare jurnal ${attempt+1}/4`,err);
       }
     }
-    throw lastError||new Error('Jurnalul nu a putut fi sincronizat.');
-  }catch(err){
-    try{
-      state.meals=parseMeals(await getCsv(LOG_ROOM));
-      renderAll();
-    }catch(readErr){
-      console.error('Recitirea EtherCalc a eșuat.',readErr);
+
+    if(!verified){
+      throw lastError||new Error('EtherCalc nu a confirmat salvarea jurnalului.');
     }
-    setSync('Jurnalul NU este sincronizat','error');
+
+    // IMPORTANT: după salvare folosim exact ce a fost recitit din EtherCalc.
+    state.meals=verified;
+    state.lastMealSaveAt=Date.now();
+    renderAll();
+
+    const active=state.meals.filter(m=>!m.deleted).length;
+    setSync(`Jurnal EtherCalc ✓ · ${active} înregistrări`,'ok');
+    return verified;
+  }catch(err){
+    console.error('Salvare jurnal EtherCalc eșuată:',err);
+
+    // Recitim sursa remote, dar nu facem un refresh automat peste înregistrarea locală
+    // până când salvarea nu a fost confirmată.
+    setSync(`Jurnal nesalvat: ${err.message}`,'error');
     throw err;
   }finally{
     state.savingMeals=false;
