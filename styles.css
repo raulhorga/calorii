@@ -223,3 +223,508 @@ button,input,select{font:inherit}button{cursor:pointer}a{color:inherit}button,a,
 #mealFoodSearch::placeholder{
   color:#a1a7b4;
 }
+
+
+/* =========================================================
+   v17 — Responsive polish: desktop + tablet + mobile
+   ========================================================= */
+
+html, body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  min-width: 0;
+}
+
+.app-shell,
+main,
+section,
+.panel,
+.card,
+.hero-card,
+.calendar-card,
+.chart-card,
+.diary-card,
+.food-panel {
+  min-width: 0;
+}
+
+img,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+/* Desktop: păstrează informația aerisită, fără lățimi rigide excesive */
+@media (min-width: 1280px) {
+  .app-shell {
+    width: min(1500px, calc(100% - 48px));
+    margin-inline: auto;
+  }
+
+  .hero-card {
+    gap: 1.4rem;
+  }
+
+  .main-grid {
+    align-items: start;
+  }
+
+  .calendar-card,
+  .chart-card,
+  .diary-card,
+  .food-panel {
+    height: auto;
+  }
+}
+
+/* Tablet / laptop îngust */
+@media (max-width: 1100px) {
+  .app-shell {
+    width: min(100%, calc(100% - 28px));
+  }
+
+  .topbar {
+    gap: .75rem;
+    flex-wrap: wrap;
+  }
+
+  .topbar__actions {
+    margin-left: auto;
+    flex-wrap: wrap;
+  }
+
+  .hero-card {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .hero-card__content,
+  .hero-card__side,
+  .target-wrap--nutrition {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .target-wrap--nutrition {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    column-gap: 1rem;
+    row-gap: .65rem;
+  }
+
+  .target-wrap--nutrition .target-percent {
+    align-self: end;
+  }
+
+  .daily-nutrition,
+  .nutrition-reference-note {
+    width: 100%;
+    grid-column: 1 / -1;
+  }
+
+  .main-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-card,
+  .chart-card,
+  .diary-card,
+  .food-panel {
+    width: 100%;
+  }
+
+  .chart-wrap,
+  #calorieChart {
+    width: 100%;
+  }
+}
+
+/* Mobile landscape / phones mari */
+@media (max-width: 760px) {
+  :root {
+    --page-gutter: 12px;
+  }
+
+  body {
+    font-size: 15px;
+  }
+
+  .app-shell {
+    width: 100%;
+    padding-inline: 12px;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    padding: .7rem 0;
+    background: color-mix(in srgb, var(--page-bg, #f6f7fb) 92%, transparent);
+    backdrop-filter: blur(14px);
+  }
+
+  .brand {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .brand__text {
+    min-width: 0;
+  }
+
+  .brand__text strong,
+  .brand__text span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .version-chip {
+    display: none;
+  }
+
+  .topbar__actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+  }
+
+  .topbar__actions .button,
+  .topbar__actions a.button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .hero-card {
+    padding: 1rem;
+    border-radius: 18px;
+  }
+
+  .hero-card__content h1 {
+    font-size: clamp(1.55rem, 7vw, 2.15rem);
+    line-height: 1.08;
+  }
+
+  .hero-card__content p {
+    font-size: .92rem;
+  }
+
+  .target-wrap--nutrition {
+    display: block;
+  }
+
+  .target-ring {
+    margin-inline: auto;
+    width: min(170px, 52vw);
+    height: min(170px, 52vw);
+  }
+
+  .target-percent {
+    display: block;
+    margin-top: .55rem;
+    text-align: center;
+  }
+
+  .daily-nutrition {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .55rem;
+  }
+
+  .daily-nutrition__item {
+    padding: .72rem .65rem;
+    border-radius: 14px;
+  }
+
+  .daily-nutrition__item:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .daily-nutrition__item span {
+    font-size: .64rem;
+  }
+
+  .daily-nutrition__item strong {
+    font-size: .9rem;
+  }
+
+  .daily-nutrition__item strong b {
+    font-size: 1.08rem;
+  }
+
+  .daily-nutrition__item small {
+    font-size: .58rem;
+  }
+
+  .nutrition-reference-note {
+    font-size: .62rem;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .65rem;
+  }
+
+  .metric-card {
+    min-width: 0;
+    padding: .85rem;
+  }
+
+  .metric-card strong {
+    font-size: 1.35rem;
+  }
+
+  .main-grid {
+    gap: .85rem;
+  }
+
+  .panel,
+  .calendar-card,
+  .chart-card,
+  .diary-card,
+  .food-panel {
+    padding: .9rem;
+    border-radius: 16px;
+  }
+
+  .panel__header,
+  .calendar-card__header,
+  .diary-card__header,
+  .food-panel .panel__header {
+    gap: .6rem;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .panel__header .button,
+  .calendar-card__header .button,
+  .diary-card__header .button,
+  .food-panel .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .calendar-toolbar,
+  .date-nav,
+  .chart-toolbar,
+  .diary-toolbar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .4rem;
+  }
+
+  .calendar-grid {
+    gap: .28rem;
+  }
+
+  .calendar-grid button,
+  .calendar-day {
+    min-height: 42px;
+    aspect-ratio: auto;
+    padding: .3rem;
+    border-radius: 10px;
+  }
+
+  .chart-wrap {
+    min-height: 250px;
+    overflow: hidden;
+  }
+
+  #calorieChart {
+    height: 250px !important;
+    max-height: 250px;
+  }
+
+  .meal-group {
+    border-radius: 14px;
+  }
+
+  .meal-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: .5rem;
+  }
+
+  .meal-row__content {
+    min-width: 0;
+  }
+
+  .meal-row__title,
+  .meal-row__meta {
+    overflow-wrap: anywhere;
+  }
+
+  .meal-row__actions {
+    flex-direction: column;
+    gap: .3rem;
+  }
+
+  .meal-row__actions button {
+    min-width: 42px;
+    min-height: 42px;
+  }
+
+  .food-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .food-header-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .food-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 12px;
+  }
+
+  .food-table {
+    min-width: 680px;
+  }
+
+  dialog {
+    width: min(100% - 18px, 620px);
+    max-height: calc(100dvh - 18px);
+    margin: auto;
+    border-radius: 18px;
+  }
+
+  dialog::backdrop {
+    background: rgba(16, 18, 28, .52);
+  }
+
+  .modal__body {
+    max-height: calc(100dvh - 170px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field,
+  .field--full {
+    grid-column: 1 / -1;
+  }
+
+  input,
+  select,
+  textarea,
+  button,
+  .button {
+    font-size: 16px; /* evită zoom-ul automat pe iOS */
+  }
+
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  textarea {
+    min-height: 92px;
+  }
+
+  .modal__footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--surface, #fff);
+    padding-top: .75rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .5rem;
+  }
+
+  .modal__footer .button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .nutrition-preview {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+/* Phones mici */
+@media (max-width: 430px) {
+  .app-shell {
+    padding-inline: 9px;
+  }
+
+  .topbar__actions,
+  .food-header-actions,
+  .modal__footer {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-nutrition {
+    grid-template-columns: 1fr;
+  }
+
+  .daily-nutrition__item:last-child {
+    grid-column: auto;
+  }
+
+  .calendar-toolbar,
+  .date-nav,
+  .chart-toolbar,
+  .diary-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-grid {
+    font-size: .78rem;
+  }
+
+  .meal-row {
+    grid-template-columns: 1fr;
+  }
+
+  .meal-row__actions {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+
+  .nutrition-preview {
+    grid-template-columns: 1fr;
+  }
+
+  .target-ring {
+    width: 150px;
+    height: 150px;
+  }
+}
+
+/* Touch ergonomics */
+@media (pointer: coarse) {
+  button,
+  .button,
+  a.button {
+    min-height: 44px;
+  }
+
+  .calendar-grid button {
+    min-height: 44px;
+  }
+}

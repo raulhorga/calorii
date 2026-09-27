@@ -143,3 +143,16 @@ Apoi înlocuiește fișierele din repository și publică prin GitHub Pages.
 - corectare eroare UI `Cannot set properties of undefined (setting 'textContent')`;
 - adăugată referința DOM lipsă pentru `targetPercent`;
 - fără modificări la sincronizarea EtherCalc sau la logica jurnalului.
+
+
+### v17
+- responsive design revizuit pentru desktop, tabletă și mobil;
+- eliminat riscul de scroll orizontal pe ecrane mici;
+- topbar și acțiuni optimizate pentru touch;
+- cardurile nutriționale se rearanjează automat pe 2 coloane / 1 coloană;
+- calendarul, graficul, jurnalul și baza de alimente se adaptează pe o singură coloană pe mobil;
+- tabelele late au scroll orizontal controlat;
+- dialogurile ocupă corect ecranul pe telefon și au footer sticky;
+- input-urile au minimum 44 px și font de 16 px pentru ergonomie și pentru a evita zoom-ul automat pe iOS;
+- butoanele sunt mai mari pe dispozitive touch;
+- desktop-ul păstrează layout-ul aerisit, cu lățime maximă mai mare.
