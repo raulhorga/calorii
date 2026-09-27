@@ -81,6 +81,64 @@ function todayISO(){
 function localISO(d){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function fromISO(s){const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 function addDays(iso,n){const d=fromISO(iso);d.setDate(d.getDate()+n);return localISO(d)}
+
+function normalizeMealDate(value){
+  const raw=String(value??'').trim();
+  if(!raw)return '';
+
+  // Already correct.
+  let m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+
+  // ISO timestamp, e.g. 2026-09-27T00:00:00...
+  m=raw.match(/^(\d{4})-(\d{2})-(\d{2})[T\s]/);
+  if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+
+  // Romanian / European style DD/MM/YYYY or DD.MM.YYYY.
+  m=raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{4})$/);
+  if(m){
+    let a=Number(m[1]),b=Number(m[2]),y=Number(m[3]);
+
+    // If first part > 12 it can only be the day.
+    // If second part > 12 it can only be the day (US-style source).
+    let day,month;
+    if(a>12){day=a;month=b}
+    else if(b>12){month=a;day=b}
+    else{
+      // EtherCalc/browser exports commonly use M/D/YYYY for ambiguous dates.
+      // Prefer US order here; explicit Romanian dates with day > 12 are handled above.
+      month=a;day=b;
+    }
+
+    if(month>=1&&month<=12&&day>=1&&day<=31){
+      return `${String(y).padStart(4,'0')}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    }
+  }
+
+  // Spreadsheet serial date (Excel/EtherCalc compatible epoch).
+  if(/^\d+(?:\.\d+)?$/.test(raw)){
+    const serial=Number(raw);
+    if(serial>20000&&serial<80000){
+      const epoch=Date.UTC(1899,11,30);
+      const d=new Date(epoch+Math.floor(serial)*86400000);
+      return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    }
+  }
+
+  // Final fallback for parseable dates.
+  const parsed=new Date(raw);
+  if(!Number.isNaN(parsed.getTime())){
+    const parts=new Intl.DateTimeFormat('en-CA',{
+      timeZone:APP_TIMEZONE,year:'numeric',month:'2-digit',day:'2-digit'
+    }).formatToParts(parsed);
+    const p={};
+    parts.forEach(x=>{if(x.type!=='literal')p[x.type]=x.value});
+    if(p.year&&p.month&&p.day)return `${p.year}-${p.month}-${p.day}`;
+  }
+
+  return raw;
+}
+
 function fmtDate(iso){const d=fromISO(iso);const today=todayISO();if(iso===today)return `Astăzi · ${d.toLocaleDateString('ro-RO',{day:'numeric',month:'long'})}`;return d.toLocaleDateString('ro-RO',{weekday:'long',day:'numeric',month:'long',year:d.getFullYear()!==new Date().getFullYear()?'numeric':undefined})}
 function setSync(text,type=''){el.syncStatus.textContent=text;el.syncStatus.dataset.type=type}
 function csvEscape(v){const s=String(v??'');return /[",\r\n]/.test(s)?`"${s.replace(/"/g,'""')}"`:s}
@@ -222,7 +280,7 @@ function parseMeals(csv){
   const hasHeader=header.includes('id');
   if(!hasHeader){
     return rows.map(r=>({
-      id:r[0]||crypto.randomUUID(),date:r[1]||'',meal:r[2]||'Gustare',
+      id:r[0]||crypto.randomUUID(),date:normalizeMealDate(r[1]||''),meal:r[2]||'Gustare',
       foodId:r[3]||'',foodName:r[4]||'',grams:num(r[5]),kcal:num(r[6]),
       fat:0,carbs:0,protein:0,fiber:0,sugar:0,note:r[7]||'',
       updatedAt:r[8]||'',deleted:false
@@ -231,7 +289,7 @@ function parseMeals(csv){
   const ix=n=>headerIndex(header,n);
   return rows.slice(1).map(r=>({
     id:r[ix('id')]||crypto.randomUUID(),
-    date:ix('date')>=0?(r[ix('date')]||''):'',
+    date:ix('date')>=0?normalizeMealDate(r[ix('date')]||''):'',
     meal:ix('meal')>=0?(r[ix('meal')]||'Gustare'):'Gustare',
     foodId:ix('food_id')>=0?(r[ix('food_id')]||''):'',
     foodName:ix('food_name')>=0?(r[ix('food_name')]||''):'',
@@ -356,7 +414,8 @@ async function syncAll({notify=false}={}){
       setSync(`Jurnal conectat · ${activeMeals} înregistrări`,'ok');
       if(notify)showToast(`Baza de alimente: ${foodError.message}`);
     }else{
-      setSync(`EtherCalc ✓ · ${activeMeals} înregistrări · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit',timeZone:APP_TIMEZONE})}`,'ok');
+      const selectedCount=mealsFor(state.selectedDate).length;
+      setSync(`EtherCalc ✓ · ${activeMeals} total · ${selectedCount} azi/zi selectată · ${new Date().toLocaleTimeString('ro-RO',{hour:'2-digit',minute:'2-digit',timeZone:APP_TIMEZONE})}`,'ok');
       if(notify)showToast('Datele au fost recitite din EtherCalc.');
     }
   }catch(e){
@@ -453,7 +512,7 @@ async function saveMeals(){
   }
 }
 
-function mealsFor(date){return state.meals.filter(m=>!m.deleted&&m.date===date)}
+function mealsFor(date){const wanted=normalizeMealDate(date);return state.meals.filter(m=>!m.deleted&&normalizeMealDate(m.date)===wanted)}
 function caloriesFor(date){return Math.round(mealsFor(date).reduce((s,m)=>s+m.kcal,0))}
 function selectedFood(){return state.foods.find(f=>f.id===el.mealFood.value)}
 function nutrientsFor(food,grams){const factor=(Number(grams)||0)/100;return {kcal:Math.round((food?.kcal100||0)*factor),fat:round1((food?.fat100||0)*factor),carbs:round1((food?.carbs100||0)*factor),protein:round1((food?.protein100||0)*factor),fiber:round1((food?.fiber100||0)*factor),sugar:round1((food?.sugar100||0)*factor)}}
@@ -604,7 +663,7 @@ async function handleMealSubmit(e){
   const n=nutrientsFor(f,grams);
   const record={
     id,
-    date:existing?.date||state.selectedDate,
+    date:normalizeMealDate(existing?.date||state.selectedDate),
     meal:el.mealType.value,
     foodId:f.id,
     foodName:f.name,
